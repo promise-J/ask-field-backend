@@ -10,7 +10,6 @@ export class ParticipantService {
       return serviceResponse(false, 'User already exists')
     }
 
-
     const newUser = participantRepo.create(data);
     return serviceResponse(true, 'User created', newUser);
   }

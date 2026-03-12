@@ -5,12 +5,12 @@ import jwt from 'jsonwebtoken';
 const participantSchema = new Schema(
   {
     email: { type: String, required: true, unique: true, trim: true },
-    password: { type: String, required: true, trim: true },
+    password: { type: String, trim: true },
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
     isVerified: { type: Boolean, default: false },
     isOnBoardingComplete: { type: Boolean, default: false },
-
+    signupPlatform: { type: String, enum: ["email", "google"], default: "email" },
     receivesUpdates: { type: Boolean, default: false },
   },
   { timestamps: true }
@@ -19,7 +19,7 @@ const participantSchema = new Schema(
 
 participantSchema.pre("save", async function (next) {
     try {
-      if (this.isModified("password")) {
+      if (this.isModified("password") && this.password) {
         // const user = this as IUser;
         const hashPassword = await bcrypt.hash(this.password, 10);
         this.password = hashPassword;
