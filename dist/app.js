@@ -21,6 +21,9 @@ app.use(express_1.default.json());
 app.use((0, morgan_1.default)('dev'));
 app.use(rateLimiter_middleware_1.rateLimiter);
 app.use('/api', routes_1.default);
+app.get("/", async (req, res) => {
+    res.send("This is the base project");
+});
 app.all("*", (req, res, next) => {
     next(new appError_1.default(`Can’t find ${req.originalUrl} with ${req.method} method on this server`, 501));
 });
