@@ -25,6 +25,11 @@ app.use(rateLimiter);
 
 app.use('/api', routes);
 
+app.get("/", async(req, res) => {
+  res.send("This is the base project");
+});
+
+
 app.all("*", (req, res, next) => {
     next(
       new AppError(
