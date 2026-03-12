@@ -16,10 +16,10 @@ export function apiSuccessResponse(
 export function apiFailureResponse(
     res: any,
     error = '',
-    statusCode = 401,
+    statusCode = 400,
   ) {
     return res.status(statusCode).json({
-      success: true,
+      success: false,
       error
     });
   }

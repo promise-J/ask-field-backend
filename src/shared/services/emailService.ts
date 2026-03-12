@@ -1,4 +1,4 @@
-const axios = require("axios");
+import axios from "axios";
 
 const sendEmail = async ({ to, subject = "New Mail", html }: {to: string; subject: string; html: string}) => {
   try {
@@ -42,4 +42,4 @@ const sendEmail = async ({ to, subject = "New Mail", html }: {to: string; subjec
   }
 };
 
-module.exports = sendEmail;
+export default sendEmail;

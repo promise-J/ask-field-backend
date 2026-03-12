@@ -1,15 +1,15 @@
 import { ParticipantModel } from '../models/participant.model';
 
 export class ParticipantRepository {
-  create(data: any) {
-    return ParticipantModel.create(data);
+  async create(data: any) {
+    return await ParticipantModel.create(data);
   }
 
-  findByEmail(email: string) {
-    return ParticipantModel.findOne({ email });
+  async findByEmail(email: string) {
+    return await ParticipantModel.findOne({ email });
   }
 
-  findById(id: string) {
-    return ParticipantModel.findById(id);
+  async findById(id: string) {
+    return await ParticipantModel.findById(id);
   }
 }

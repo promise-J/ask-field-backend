@@ -1,11 +1,13 @@
 import { Router } from 'express';
-import { createUser, getUser } from '../controllers/participant.controller';
+import { createUser, getUser, verifyEmail } from '../controllers/participant.controller';
 import { validate } from '../../../middlewares/validate';
-import { createParticipantSchema } from '../user.validation';
+import { createParticipantSchema, verifyEmailQuerySchema } from '../user.validation';
+import { validateQuery } from '../../../middlewares/validateQuery';
 
 const router = Router();
 
-router.post('/create', validate(createParticipantSchema),createUser);
+router.post('/auth/register', validate(createParticipantSchema),createUser);
+router.get('/auth/verify-email', verifyEmail);
 router.get('/:id', getUser);
 
 export default router;

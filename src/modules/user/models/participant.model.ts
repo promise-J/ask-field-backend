@@ -9,9 +9,14 @@ const participantSchema = new Schema(
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
     isVerified: { type: Boolean, default: false },
+    verificationToken: { type: String },
     isOnBoardingComplete: { type: Boolean, default: false },
     signupPlatform: { type: String, enum: ["email", "google"], default: "email" },
     receivesUpdates: { type: Boolean, default: false },
+    image: {
+      imageUrl: { type: String },
+      publicId: { type: String },
+    }
   },
   { timestamps: true }
 );
