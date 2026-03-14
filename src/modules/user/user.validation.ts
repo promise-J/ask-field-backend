@@ -14,3 +14,7 @@ export const verifyEmailQuerySchema = z.object({
   email: z.string().email(),
   token: z.string().min(10, "Invalid token"), // adjust min length based on your token generation
 });
+
+export const googleAuthSchema = z.object({
+  token: z.string().min(10, "Invalid token"),
+})

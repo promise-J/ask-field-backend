@@ -12,4 +12,8 @@ export class ParticipantRepository {
   async findById(id: string) {
     return await ParticipantModel.findById(id);
   }
+
+  async findOne(query: any) {
+    return await ParticipantModel.findOne(query);
+  }
 }

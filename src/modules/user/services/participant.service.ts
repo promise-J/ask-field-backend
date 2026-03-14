@@ -3,6 +3,7 @@ import sendEmail from "../../../shared/services/emailService";
 import { serviceResponse } from "../../../utils/apiResponse";
 import { ParticipantRepository } from "../repositories/participant.repository";
 import crypto from "crypto";
+import admin from "../../../firebaseAdmin";
 
 const participantRepo = new ParticipantRepository();
 
@@ -70,6 +71,67 @@ export class ParticipantService {
     return serviceResponse(true, "Email verified successfully", {
       redirectUrl: `${process.env.FRONTEND_BASE_URL}/waitlist?verified=true`,
     });
+  }
+
+  async googleAuth(data: { token: string }) {
+    try {
+      const { token } = data;
+
+      if (!token) {
+        return serviceResponse(false, "Token is required");
+      }
+
+      const decodedToken = await admin.auth().verifyIdToken(token);
+
+      const { email, name, picture, sub: googleId } = decodedToken;
+
+      const newUser = {
+        email,
+        firstName: name.split(' ')[0] || "",
+        lastName: name.split(' ')[1] || "",
+        image: { imageUrl: picture, publicId: "" },
+        googleId,
+        signupPlatform: "google",
+        isVerified: true,
+      };
+
+      let user = await participantRepo.findOne({
+        $or: [{ googleId }, { email }],
+      });
+
+
+      if (!user) {
+        user = await participantRepo.create(newUser);
+        const accessToken = await user.generateAccessToken();
+
+        const emailHtml = `
+        <h1>Registration successful</h1>
+        <p>Hi <strong>${newUser.email}</strong>,</p>
+        <p>You have successfully sign up:</p>
+        `;
+        await sendEmail({
+          subject: "Welcome to Ask Field",
+          to: user.email,
+          html: emailHtml,
+        });
+
+        return serviceResponse(true, "Google authentication successful", {
+          token: accessToken,
+          user,
+        });
+      } else {
+        // const refreshToken = await user.generateRefreshToken();
+        const accessToken = await user.generateAccessToken();
+
+        return serviceResponse(true, "Google authentication successful", {
+          token: accessToken,
+          user,
+        });
+      }
+    } catch (error) {
+      console.error("Google authentication error:", error);
+      return serviceResponse(false, "Google authentication failed");
+    }
   }
 
   async getUser(id: string) {

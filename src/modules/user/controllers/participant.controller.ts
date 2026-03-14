@@ -17,11 +17,21 @@ export const createUser = asyncHandler(
 
 export const verifyEmail = asyncHandler(
   async (req: Request, res: Response) => {
-    const user = await participantService.verifyEmail(req.body, req);
-    if(!user.success){
-      return apiFailureResponse(res, user.message);
+    const response = await participantService.verifyEmail(req.body, req);
+    if(!response.success){
+      return apiFailureResponse(res, response.message);
     }
-    apiSuccessResponse(res, user.message, user, 201);
+    apiSuccessResponse(res, response.message, response, 201);
+  }
+);
+
+export const googleAuth = asyncHandler(
+  async (req: Request, res: Response) => {
+    const response = await participantService.googleAuth(req.body);
+    if(!response.success){
+      return apiFailureResponse(res, response.message);
+    }
+    apiSuccessResponse(res, response.message, response, 201);
   }
 );
 

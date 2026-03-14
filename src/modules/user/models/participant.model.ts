@@ -2,7 +2,33 @@ import { Schema, model } from 'mongoose';
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken';
 
-const participantSchema = new Schema(
+export interface IParticipant extends Document {
+  email: string;
+  password?: string;
+  firstName: string;
+  lastName: string;
+  isVerified: boolean;
+  verificationToken?: string;
+  isOnBoardingComplete: boolean;
+  signupPlatform: 'email' | 'google';
+  receivesUpdates: boolean;
+  image?: {
+    imageUrl?: string;
+    publicId?: string;
+  };
+  googleId?: string;
+  subscriptionStatus?: string; // optional, used in isSubscriptionActive
+  subscriptionExpiry?: Date;   // optional, used in isSubscriptionActive
+  userType?: string;           // optional, used in JWT methods
+
+  // Instance methods
+  comparePassword(password: string): Promise<boolean>;
+  isSubscriptionActive(): boolean;
+  generateAccessToken(): Promise<string>;
+  generateRefreshToken(): Promise<string>;
+}
+
+const participantSchema = new Schema<IParticipant>(
   {
     email: { type: String, required: true, unique: true, trim: true },
     password: { type: String, trim: true },
@@ -13,10 +39,11 @@ const participantSchema = new Schema(
     isOnBoardingComplete: { type: Boolean, default: false },
     signupPlatform: { type: String, enum: ["email", "google"], default: "email" },
     receivesUpdates: { type: Boolean, default: false },
+    googleId: { type: String, unique: true, sparse: true },
     image: {
       imageUrl: { type: String },
       publicId: { type: String },
-    }
+    },
   },
   { timestamps: true }
 );
@@ -55,25 +82,25 @@ participantSchema.pre("save", async function (next) {
     );
   };
   
-  participantSchema.methods.generateAccessToken = async function (secretToken: string) {
+  participantSchema.methods.generateAccessToken = async function () {
     const token = jwt.sign(
       {
         id: this._id,
         userType: this.userType,
       },
-      secretToken,
+      process.env.JWT_SECRET || '',
       { expiresIn: "1h" }
     );
     return token;
   };
   
-  participantSchema.methods.generateRefreshToken = async function (secretToken: string) {
+  participantSchema.methods.generateRefreshToken = async function () {
     const token = jwt.sign(
       {
         id: this._id,
         userType: this.userType,
       },
-      secretToken,
+      process.env.JWT_SECRET || '',
       { expiresIn: "4w" }
     );
     return token;

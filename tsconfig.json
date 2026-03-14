@@ -8,6 +8,7 @@
       "strict": true,
       "forceConsistentCasingInFileNames": true,
       "skipLibCheck": true,
+      "resolveJsonModule": true,
       // "include": ["src", "types"]
     },
     // "include": ["src/**/*.ts", "src/types/**/*.d.ts"]
