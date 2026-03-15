@@ -9,16 +9,29 @@ const participantRepo = new ParticipantRepository();
 
 export class ParticipantService {
   async createUser(data: any) {
-    const exists = await participantRepo.findByEmail(data.email);
-    if (exists) {
+    let user = await participantRepo.findByEmail(data.email);
+
+    if (user && user.isVerified) {
       return serviceResponse(false, "User already exists");
     }
 
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const newUser = await participantRepo.create({
-      ...data,
-      verificationToken,
-    });
+    const verificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);
+
+    if (user && !user.isVerified) {
+      user.password = data.password;
+      user.firstName = data.firstName;
+      user.lastName = data.lastName;
+      user.verificationToken = verificationToken;
+      user.verificationTokenExpires = verificationTokenExpires;
+      user.save()
+    } else {
+      user = await participantRepo.create({
+        ...data,
+        verificationToken,
+        verificationTokenExpires,
+      });
+    }
 
     const baseFrontendUrl = process.env.FRONTEND_BASE_URL || "";
     const verificationUrl = `${baseFrontendUrl}/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(
@@ -30,6 +43,7 @@ export class ParticipantService {
     <p>Hi <strong>${data.email}</strong>,</p>
     <p>Click the link below to verify your email:</p>
     <a href="${verificationUrl}">Verify Email</a>
+    <p>This link expires in 15 minutes.</p>
   `;
 
     // Send email
@@ -44,8 +58,69 @@ export class ParticipantService {
     return serviceResponse(
       true,
       "User created. Verification email sent.",
-      newUser
+      user
     );
+  }
+  async loginUser(data: any) {
+    const userExists = await participantRepo.findByEmail(data.email);
+    if (!userExists) {
+      return serviceResponse(false, "You are not registered. Please register");
+    }
+
+    if (userExists.signupPlatform === "google") {
+      // If the user signed up via Google, prevent local login attempt
+      if (data.password) {
+        return serviceResponse(
+          false,
+          "This account was created using Google. Please log in using Google."
+        );
+      }
+    }
+
+    if (!userExists.isVerified) {
+      const verificationToken = crypto.randomBytes(32).toString("hex");
+      const verificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);
+
+      (userExists.verificationToken = verificationToken),
+        (userExists.verificationTokenExpires = verificationTokenExpires);
+
+      const baseFrontendUrl = process.env.FRONTEND_BASE_URL || "";
+      const verificationUrl = `${baseFrontendUrl}/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(
+        data.email
+      )}`;
+
+      const emailHtml = `
+    <h1>Verify Your Email</h1>
+    <p>Hi <strong>${data.email}</strong>,</p>
+    <p>Click the link below to verify your email:</p>
+    <a href="${verificationUrl}">Verify Email</a>
+    <p>This link expires in 15 minutes.</p>
+  `;
+
+      // Send email
+
+      await sendEmail({
+        subject: "Verify Your Email",
+        to: data.email,
+        html: emailHtml,
+      });
+
+      return serviceResponse(
+        false,
+        "User is not verified. An email has been sent to you"
+      );
+    }
+
+    if (!(await userExists.comparePassword(data.password))) {
+      return serviceResponse(false, "Wrong email or password");
+    }
+
+    const accessToken = await userExists.generateAccessToken();
+
+    return serviceResponse(true, "Login Successful.", {
+      user: userExists,
+      token: accessToken,
+    });
   }
   async verifyEmail(data: any, req: Request) {
     const { token, email } = req.query;
@@ -56,16 +131,29 @@ export class ParticipantService {
         "Invalid link. Please contact the administrator."
       );
     }
-
+    
     const user = await participantRepo.findByEmail(email as string);
+    
+    if (!user) {
+      return serviceResponse(false, "User not found.");
+    }
 
-    if (!user || user.verificationToken !== token) {
+    if (user.verificationToken !== token) {
       return serviceResponse(false, "Invalid or expired token");
+    }
+    
+    if (
+      !user.verificationTokenExpires ||
+      user.verificationTokenExpires < new Date()
+    ) {
+      return serviceResponse(false, "Verification token has expired");
     }
 
     // Mark user as verified
     user.isVerified = true;
-    user.verificationToken = undefined; // clear token
+    user.verificationToken = undefined;
+    user.verificationTokenExpires = null;
+
     await user.save();
 
     return serviceResponse(true, "Email verified successfully", {
@@ -87,8 +175,8 @@ export class ParticipantService {
 
       const newUser = {
         email,
-        firstName: name.split(' ')[0] || "",
-        lastName: name.split(' ')[1] || "",
+        firstName: name.split(" ")[0] || "",
+        lastName: name.split(" ")[1] || "",
         image: { imageUrl: picture, publicId: "" },
         googleId,
         signupPlatform: "google",
@@ -98,7 +186,6 @@ export class ParticipantService {
       let user = await participantRepo.findOne({
         $or: [{ googleId }, { email }],
       });
-
 
       if (!user) {
         user = await participantRepo.create(newUser);

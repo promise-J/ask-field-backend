@@ -9,6 +9,7 @@ export interface IParticipant extends Document {
   lastName: string;
   isVerified: boolean;
   verificationToken?: string;
+  verificationTokenExpires: Date | null;
   isOnBoardingComplete: boolean;
   signupPlatform: 'email' | 'google';
   receivesUpdates: boolean;
@@ -19,7 +20,7 @@ export interface IParticipant extends Document {
   googleId?: string;
   subscriptionStatus?: string; // optional, used in isSubscriptionActive
   subscriptionExpiry?: Date;   // optional, used in isSubscriptionActive
-  userType?: string;           // optional, used in JWT methods
+  userType?: string;        // optional, used in JWT methods
 
   // Instance methods
   comparePassword(password: string): Promise<boolean>;
@@ -36,10 +37,12 @@ const participantSchema = new Schema<IParticipant>(
     lastName: { type: String, required: true, trim: true },
     isVerified: { type: Boolean, default: false },
     verificationToken: { type: String },
+    verificationTokenExpires: {type: Date},
     isOnBoardingComplete: { type: Boolean, default: false },
     signupPlatform: { type: String, enum: ["email", "google"], default: "email" },
     receivesUpdates: { type: Boolean, default: false },
     googleId: { type: String, unique: true, sparse: true },
+    userType: {type: String, default: 'participant'},
     image: {
       imageUrl: { type: String },
       publicId: { type: String },

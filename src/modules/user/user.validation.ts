@@ -8,6 +8,10 @@ export const createParticipantSchema = z.object({
   signupPlatform: z.enum(['email', 'google']).default('email'),
   receivesUpdates: z.boolean().default(false),
 });
+export const loginParticipantSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
 
 
 export const verifyEmailQuerySchema = z.object({

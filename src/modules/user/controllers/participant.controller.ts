@@ -15,6 +15,16 @@ export const createUser = asyncHandler(
   }
 );
 
+export const loginUser = asyncHandler(
+  async (req: Request, res: Response) => {
+    const response = await participantService.loginUser(req.body);
+    if(!response.success){
+      return apiFailureResponse(res, response.message);
+    }
+    apiSuccessResponse(res, response.message, response, 201);
+  }
+);
+
 export const verifyEmail = asyncHandler(
   async (req: Request, res: Response) => {
     const response = await participantService.verifyEmail(req.body, req);
