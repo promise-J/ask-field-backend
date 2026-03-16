@@ -11,6 +11,6 @@
       "resolveJsonModule": true,
       // "include": ["src", "types"]
     },
-    // "include": ["src/**/*.ts", "src/types/**/*.d.ts"]
-    "include": ["src"]
+    "include": ["src/**/*.ts", "src/types/**/*.d.ts"]
+    // "include": ["src"]
   }

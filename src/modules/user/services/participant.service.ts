@@ -24,7 +24,7 @@ export class ParticipantService {
       user.lastName = data.lastName;
       user.verificationToken = verificationToken;
       user.verificationTokenExpires = verificationTokenExpires;
-      user.save()
+      user.save();
     } else {
       user = await participantRepo.create({
         ...data,
@@ -122,7 +122,7 @@ export class ParticipantService {
       token: accessToken,
     });
   }
-  async verifyEmail(data: any, req: Request) {
+  async verifyEmail(req: Request) {
     const { token, email } = req.query;
 
     if (!token || !email) {
@@ -131,9 +131,9 @@ export class ParticipantService {
         "Invalid link. Please contact the administrator."
       );
     }
-    
+
     const user = await participantRepo.findByEmail(email as string);
-    
+
     if (!user) {
       return serviceResponse(false, "User not found.");
     }
@@ -141,7 +141,7 @@ export class ParticipantService {
     if (user.verificationToken !== token) {
       return serviceResponse(false, "Invalid or expired token");
     }
-    
+
     if (
       !user.verificationTokenExpires ||
       user.verificationTokenExpires < new Date()
@@ -164,6 +164,7 @@ export class ParticipantService {
   async googleAuth(data: { token: string }) {
     try {
       const { token } = data;
+      console.log('google call ********')
 
       if (!token) {
         return serviceResponse(false, "Token is required");
@@ -221,9 +222,10 @@ export class ParticipantService {
     }
   }
 
-  async getUser(id: string) {
+  async getUser() {
+    const id = '69b82c631f9fafea5b8f9cde'
     const user = await participantRepo.findById(id);
-    if (!user) throw new Error("User not found");
-    return user;
+    if (!user) return serviceResponse(false, 'User is not found');
+    return serviceResponse(true, 'User fetched successfully', {user});
   }
 }

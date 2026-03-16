@@ -11,27 +11,28 @@ export const createUser = asyncHandler(
     if(!response.success){
       return apiFailureResponse(res, response.message);
     }
-    apiSuccessResponse(res, response.message, response, 201);
+    apiSuccessResponse(res, response.message, response.data, 201);
   }
 );
 
 export const loginUser = asyncHandler(
   async (req: Request, res: Response) => {
     const response = await participantService.loginUser(req.body);
+    console.log({response: response.data})
     if(!response.success){
       return apiFailureResponse(res, response.message);
     }
-    apiSuccessResponse(res, response.message, response, 201);
+    apiSuccessResponse(res, response.message, response.data, 201);
   }
 );
 
 export const verifyEmail = asyncHandler(
   async (req: Request, res: Response) => {
-    const response = await participantService.verifyEmail(req.body, req);
+    const response = await participantService.verifyEmail(req);
     if(!response.success){
       return apiFailureResponse(res, response.message);
     }
-    apiSuccessResponse(res, response.message, response, 201);
+    apiSuccessResponse(res, response.message, response.data, 201);
   }
 );
 
@@ -41,13 +42,16 @@ export const googleAuth = asyncHandler(
     if(!response.success){
       return apiFailureResponse(res, response.message);
     }
-    apiSuccessResponse(res, response.message, response, 201);
+    apiSuccessResponse(res, response.message, response.data, 201);
   }
 );
 
 export const getUser = asyncHandler(
   async (req: Request, res: Response) => {
-    const user = await participantService.getUser(req.params.id);
-    apiSuccessResponse(res, 'User Fetched',user);
+    const response = await participantService.getUser();
+    if(!response.success){
+      return apiFailureResponse(res, response.message)
+    }
+    apiSuccessResponse(res, 'User Fetched', response.data);
   }
 );
