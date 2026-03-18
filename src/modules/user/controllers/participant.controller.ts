@@ -18,7 +18,6 @@ export const createUser = asyncHandler(
 export const loginUser = asyncHandler(
   async (req: Request, res: Response) => {
     const response = await participantService.loginUser(req.body);
-    console.log({response: response.data})
     if(!response.success){
       return apiFailureResponse(res, response.message);
     }
@@ -48,7 +47,7 @@ export const googleAuth = asyncHandler(
 
 export const getUser = asyncHandler(
   async (req: Request, res: Response) => {
-    const response = await participantService.getUser();
+    const response = await participantService.getUser(req);
     if(!response.success){
       return apiFailureResponse(res, response.message)
     }

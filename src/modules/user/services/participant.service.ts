@@ -9,80 +9,30 @@ const participantRepo = new ParticipantRepository();
 
 export class ParticipantService {
   async createUser(data: any) {
-    let user = await participantRepo.findByEmail(data.email);
+    try {
+      let user = await participantRepo.findByEmail(data.email);
 
-    if (user && user.isVerified) {
-      return serviceResponse(false, "User already exists");
-    }
-
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const verificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);
-
-    if (user && !user.isVerified) {
-      user.password = data.password;
-      user.firstName = data.firstName;
-      user.lastName = data.lastName;
-      user.verificationToken = verificationToken;
-      user.verificationTokenExpires = verificationTokenExpires;
-      user.save();
-    } else {
-      user = await participantRepo.create({
-        ...data,
-        verificationToken,
-        verificationTokenExpires,
-      });
-    }
-
-    const baseFrontendUrl = process.env.FRONTEND_BASE_URL || "";
-    const verificationUrl = `${baseFrontendUrl}/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(
-      data.email
-    )}`;
-
-    const emailHtml = `
-    <h1>Verify Your Email</h1>
-    <p>Hi <strong>${data.email}</strong>,</p>
-    <p>Click the link below to verify your email:</p>
-    <a href="${verificationUrl}">Verify Email</a>
-    <p>This link expires in 15 minutes.</p>
-  `;
-
-    // Send email
-    if (data.signupPlatform === "email") {
-      await sendEmail({
-        subject: "Verify Your Email",
-        to: data.email,
-        html: emailHtml,
-      });
-    }
-
-    return serviceResponse(
-      true,
-      "User created. Verification email sent.",
-      user
-    );
-  }
-  async loginUser(data: any) {
-    const userExists = await participantRepo.findByEmail(data.email);
-    if (!userExists) {
-      return serviceResponse(false, "You are not registered. Please register");
-    }
-
-    if (userExists.signupPlatform === "google") {
-      // If the user signed up via Google, prevent local login attempt
-      if (data.password) {
-        return serviceResponse(
-          false,
-          "This account was created using Google. Please log in using Google."
-        );
+      if (user && user.isVerified) {
+        return serviceResponse(false, "User already exists");
       }
-    }
 
-    if (!userExists.isVerified) {
       const verificationToken = crypto.randomBytes(32).toString("hex");
       const verificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);
 
-      (userExists.verificationToken = verificationToken),
-        (userExists.verificationTokenExpires = verificationTokenExpires);
+      if (user && !user.isVerified) {
+        user.password = data.password;
+        user.firstName = data.firstName;
+        user.lastName = data.lastName;
+        user.verificationToken = verificationToken;
+        user.verificationTokenExpires = verificationTokenExpires;
+        user.save();
+      } else {
+        user = await participantRepo.create({
+          ...data,
+          verificationToken,
+          verificationTokenExpires,
+        });
+      }
 
       const baseFrontendUrl = process.env.FRONTEND_BASE_URL || "";
       const verificationUrl = `${baseFrontendUrl}/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(
@@ -98,73 +48,149 @@ export class ParticipantService {
   `;
 
       // Send email
-
-      await sendEmail({
-        subject: "Verify Your Email",
-        to: data.email,
-        html: emailHtml,
-      });
+      if (data.signupPlatform === "email") {
+        await sendEmail({
+          subject: "Verify Your Email",
+          to: data.email,
+          html: emailHtml,
+        });
+      }
 
       return serviceResponse(
+        true,
+        "User created. Verification email sent.",
+        user
+      );
+    } catch (error) {
+      console.log(error, "the get user");
+      return serviceResponse(
         false,
-        "User is not verified. An email has been sent to you"
+        "Something went wrong. Please try again later"
       );
     }
+  }
+  async loginUser(data: any) {
+    try {
+      const userExists = await participantRepo.findByEmail(data.email);
+      if (!userExists) {
+        return serviceResponse(
+          false,
+          "You are not registered. Please register"
+        );
+      }
 
-    if (!(await userExists.comparePassword(data.password))) {
-      return serviceResponse(false, "Wrong email or password");
+      if (userExists.signupPlatform === "google") {
+        // If the user signed up via Google, prevent local login attempt
+        if (data.password) {
+          return serviceResponse(
+            false,
+            "This account was created using Google. Please log in using Google."
+          );
+        }
+      }
+
+      if (!userExists.isVerified) {
+        const verificationToken = crypto.randomBytes(32).toString("hex");
+        const verificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);
+
+        (userExists.verificationToken = verificationToken),
+          (userExists.verificationTokenExpires = verificationTokenExpires);
+
+        const baseFrontendUrl = process.env.FRONTEND_BASE_URL || "";
+        const verificationUrl = `${baseFrontendUrl}/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(
+          data.email
+        )}`;
+
+        const emailHtml = `
+    <h1>Verify Your Email</h1>
+    <p>Hi <strong>${data.email}</strong>,</p>
+    <p>Click the link below to verify your email:</p>
+    <a href="${verificationUrl}">Verify Email</a>
+    <p>This link expires in 15 minutes.</p>
+  `;
+
+        // Send email
+
+        await sendEmail({
+          subject: "Verify Your Email",
+          to: data.email,
+          html: emailHtml,
+        });
+
+        return serviceResponse(
+          false,
+          "User is not verified. An email has been sent to you"
+        );
+      }
+
+      if (!(await userExists.comparePassword(data.password))) {
+        return serviceResponse(false, "Wrong email or password");
+      }
+
+      const accessToken = await userExists.generateAccessToken();
+
+      return serviceResponse(true, "Login Successful.", {
+        user: userExists,
+        token: accessToken,
+      });
+    } catch (error) {
+      console.log(error, "the get user");
+      return serviceResponse(
+        false,
+        "Something went wrong. Please try again later"
+      );
     }
-
-    const accessToken = await userExists.generateAccessToken();
-
-    return serviceResponse(true, "Login Successful.", {
-      user: userExists,
-      token: accessToken,
-    });
   }
   async verifyEmail(req: Request) {
-    const { token, email } = req.query;
+    try {
+      const { token, email } = req.query;
 
-    if (!token || !email) {
+      if (!token || !email) {
+        return serviceResponse(
+          false,
+          "Invalid link. Please contact the administrator."
+        );
+      }
+
+      const user = await participantRepo.findByEmail(email as string);
+
+      if (!user) {
+        return serviceResponse(false, "User not found.");
+      }
+
+      if (user.verificationToken !== token) {
+        return serviceResponse(false, "Invalid or expired token");
+      }
+
+      if (
+        !user.verificationTokenExpires ||
+        user.verificationTokenExpires < new Date()
+      ) {
+        return serviceResponse(false, "Verification token has expired");
+      }
+
+      // Mark user as verified
+      user.isVerified = true;
+      user.verificationToken = undefined;
+      user.verificationTokenExpires = null;
+
+      await user.save();
+
+      return serviceResponse(true, "Email verified successfully", {
+        redirectUrl: `${process.env.FRONTEND_BASE_URL}/waitlist?verified=true`,
+      });
+    } catch (error) {
+      console.log(error, "the get user");
       return serviceResponse(
         false,
-        "Invalid link. Please contact the administrator."
+        "Something went wrong. Please try again later"
       );
     }
-
-    const user = await participantRepo.findByEmail(email as string);
-
-    if (!user) {
-      return serviceResponse(false, "User not found.");
-    }
-
-    if (user.verificationToken !== token) {
-      return serviceResponse(false, "Invalid or expired token");
-    }
-
-    if (
-      !user.verificationTokenExpires ||
-      user.verificationTokenExpires < new Date()
-    ) {
-      return serviceResponse(false, "Verification token has expired");
-    }
-
-    // Mark user as verified
-    user.isVerified = true;
-    user.verificationToken = undefined;
-    user.verificationTokenExpires = null;
-
-    await user.save();
-
-    return serviceResponse(true, "Email verified successfully", {
-      redirectUrl: `${process.env.FRONTEND_BASE_URL}/waitlist?verified=true`,
-    });
   }
 
   async googleAuth(data: { token: string }) {
     try {
       const { token } = data;
-      console.log('google call ********')
 
       if (!token) {
         return serviceResponse(false, "Token is required");
@@ -222,10 +248,24 @@ export class ParticipantService {
     }
   }
 
-  async getUser() {
-    const id = '69b82c631f9fafea5b8f9cde'
-    const user = await participantRepo.findById(id);
-    if (!user) return serviceResponse(false, 'User is not found');
-    return serviceResponse(true, 'User fetched successfully', {user});
+  async getUser(req: Request) {
+    try {
+      const userId = req.user?.id || '';
+
+      if (!req.user || !req.user.id) {
+        return serviceResponse(false, "Unauthorized: No user found in request");
+      }
+      
+      console.log(userId);
+      const user = await participantRepo.findById(userId);
+      if (!user) return serviceResponse(false, "User is not found");
+      return serviceResponse(true, "User fetched successfully", user);
+    } catch (error) {
+      console.log(error, "the get user");
+      return serviceResponse(
+        false,
+        "Something went wrong. Please try again later"
+      );
+    }
   }
 }
