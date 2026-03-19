@@ -4,11 +4,48 @@ import { serviceResponse } from "../../../utils/apiResponse";
 import { ParticipantRepository } from "../repositories/participant.repository";
 import crypto from "crypto";
 import admin from "../../../firebaseAdmin";
+import { ParticipantProfileRepository } from "../repositories/participant.profile.repository";
+import { signAccessToken, verifyRefreshToken } from "../../../utils/jwt";
+import { JwtPayload } from "jsonwebtoken";
+
+type LoginUserReq = { email: string; password: string };
+
+type CreateUserReq = {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  signupPlatform: string;
+};
+
+type CompleteProfileReq = {
+  gender: string;
+  ethnic: string;
+  educationLevel: string;
+  isStudent: string;
+  dob_day: string;
+  dob_month: string;
+  dob_year: string;
+  firstLanguage: string;
+  fluentLanguage: string;
+  dialect: string;
+  countryOfBirth: string;
+  countryOfResidence: string;
+  pob: string;
+  mostLifeTime: string;
+  mostTimeSpent: string;
+  currency: string;
+  payPerHour: string;
+  workHour: string;
+  shareLinkedin: string;
+  employmentStatus: string;
+};
 
 const participantRepo = new ParticipantRepository();
+const participantProfileRepo = new ParticipantProfileRepository();
 
 export class ParticipantService {
-  async createUser(data: any) {
+  async createUser(data: CreateUserReq) {
     try {
       let user = await participantRepo.findByEmail(data.email);
 
@@ -69,7 +106,7 @@ export class ParticipantService {
       );
     }
   }
-  async loginUser(data: any) {
+  async loginUser(data: LoginUserReq) {
     try {
       const userExists = await participantRepo.findByEmail(data.email);
       if (!userExists) {
@@ -128,10 +165,12 @@ export class ParticipantService {
       }
 
       const accessToken = await userExists.generateAccessToken();
+      const refreshToken = await userExists.generateRefreshToken();
 
       return serviceResponse(true, "Login Successful.", {
         user: userExists,
-        token: accessToken,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
       });
     } catch (error) {
       console.log(error, "the get user");
@@ -236,10 +275,12 @@ export class ParticipantService {
       } else {
         // const refreshToken = await user.generateRefreshToken();
         const accessToken = await user.generateAccessToken();
+        const refreshToken = await user.generateRefreshToken();
 
         return serviceResponse(true, "Google authentication successful", {
-          token: accessToken,
+          accessToken: accessToken,
           user,
+          refreshToken,
         });
       }
     } catch (error) {
@@ -250,22 +291,121 @@ export class ParticipantService {
 
   async getUser(req: Request) {
     try {
-      const userId = req.user?.id || '';
+      const userId = req.user?.id || "";
 
       if (!req.user || !req.user.id) {
         return serviceResponse(false, "Unauthorized: No user found in request");
       }
-      
-      console.log(userId);
+
       const user = await participantRepo.findById(userId);
       if (!user) return serviceResponse(false, "User is not found");
       return serviceResponse(true, "User fetched successfully", user);
     } catch (error) {
-      console.log(error, "the get user");
       return serviceResponse(
         false,
         "Something went wrong. Please try again later"
       );
+    }
+  }
+
+  async completeProfile(req: Request, data: CompleteProfileReq) {
+    try {
+      const userId = req.user?.id || "";
+
+      const user = await participantRepo.findById(userId)
+
+      if(!user){
+        return serviceResponse(false, "User does not exist")
+      }
+
+      const profileExists = await participantProfileRepo.findByUserId(userId);
+      if (profileExists && profileExists.status == "completed") {
+        return serviceResponse(true, "Your profile has already been completed");
+      }
+
+      const {
+        gender,
+        ethnic,
+        educationLevel,
+        isStudent,
+        dob_day,
+        dob_month,
+        dob_year,
+        firstLanguage,
+        fluentLanguage,
+        dialect,
+        countryOfBirth,
+        countryOfResidence,
+        pob,
+        mostTimeSpent,
+        mostLifeTime,
+        currency,
+        payPerHour,
+        workHour,
+        shareLinkedin,
+        employmentStatus
+      } = data;
+
+      const newProfile = {
+        userId,
+        countryOfBirth,
+        countryOfResidence,
+        currency,
+        dialect,
+        dob_day,
+        dob_month,
+        dob_year,
+        educationLevel,
+        ethnic,
+        firstLanguage,
+        fluentLanguage,
+        gender,
+        isStudent,
+        mostLifeTime,
+        mostTimeSpent,
+        payPerHour,
+        pob,
+        shareLinkedin,
+        workHour,
+        employmentStatus,
+        status: 'completed'
+      };
+
+      const createdProfile = await participantProfileRepo.create(newProfile)
+
+      user.isCompleteProfile = true;
+      await user.save()
+
+      return serviceResponse(true, "good to go", {profile: createdProfile});
+    } catch (error) {
+      console.log(error)
+      return serviceResponse(
+        false,
+        "Something went wrong. Please try again later"
+      );
+    }
+  }
+
+  async getRefreshToken(req: Request) {
+    try {
+      const refreshToken = req.header("token");
+
+      if (!refreshToken) {
+        return serviceResponse(false, "No refresh token");
+      }
+
+      const decoded = verifyRefreshToken(refreshToken) as JwtPayload;
+
+      const { iat, exp, ...payload } = decoded;
+
+      const newAccessToken = signAccessToken(payload);
+
+      return serviceResponse(true, "Token verified", {
+        accessToken: newAccessToken,
+      });
+    } catch (err) {
+      console.log(err, "the err");
+      return serviceResponse(false, "Invalid refresh token");
     }
   }
 }

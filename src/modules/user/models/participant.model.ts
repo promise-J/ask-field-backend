@@ -1,6 +1,7 @@
 import { Schema, model } from 'mongoose';
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken';
+import { env } from '../../../config';
 
 export interface IParticipant extends Document {
   email: string;
@@ -21,6 +22,7 @@ export interface IParticipant extends Document {
   subscriptionStatus?: string; // optional, used in isSubscriptionActive
   subscriptionExpiry?: Date;   // optional, used in isSubscriptionActive
   userType?: string;        // optional, used in JWT methods
+  isCompleteProfile: boolean;
 
   // Instance methods
   comparePassword(password: string): Promise<boolean>;
@@ -47,6 +49,7 @@ const participantSchema = new Schema<IParticipant>(
       imageUrl: { type: String },
       publicId: { type: String },
     },
+    isCompleteProfile: {type: Boolean, default: false}
   },
   { timestamps: true }
 );
@@ -91,8 +94,8 @@ participantSchema.pre("save", async function (next) {
         id: this._id,
         userType: this.userType,
       },
-      process.env.JWT_SECRET || '',
-      { expiresIn: "1h" }
+      env.ACCESS_SECRET || '',
+      { expiresIn: "1m" }
     );
     return token;
   };
@@ -103,8 +106,8 @@ participantSchema.pre("save", async function (next) {
         id: this._id,
         userType: this.userType,
       },
-      process.env.JWT_SECRET || '',
-      { expiresIn: "4w" }
+      env.REFRESH_SECRET || '',
+      { expiresIn: "1w" }
     );
     return token;
   };

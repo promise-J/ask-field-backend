@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 
 export function authMiddleware(
@@ -14,10 +14,11 @@ export function authMiddleware(
   }
 
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as {id: string, userType: string};
+    const payload = jwt.verify(token, env.ACCESS_SECRET) as {id: string, userType: string};
     req.user = payload;
     next();
-  } catch {
-    res.status(401).json({ message: "Invalid token" });
+  } catch(error) {
+    res.status(401).json({ message: error });
+    // res.status(401).json({ message: "Invalid token" });
   }
 }

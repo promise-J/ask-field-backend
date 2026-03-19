@@ -1,15 +1,44 @@
-import { Router } from 'express';
-import { createUser, getUser, googleAuth, loginUser, verifyEmail } from '../controllers/participant.controller';
-import { validate } from '../../../middlewares/validate';
-import { createParticipantSchema, loginParticipantSchema } from '../user.validation';
-import { authMiddleware } from '../../../middlewares/auth.middleware';
+import { Router } from "express";
+import {
+  completeProfile,
+  createUser,
+  getRefreshToken,
+  getUser,
+  googleAuth,
+  loginUser,
+  verifyEmail,
+} from "../controllers/participant.controller";
+import { validate } from "../../../middlewares/validate";
+import {
+  completeProfileSchema,
+  createParticipantSchema,
+  googleAuthSchema,
+  loginParticipantSchema,
+} from "../user.validation";
+import { authMiddleware } from "../../../middlewares/auth.middleware";
+import {
+  ROUTE_AUTH_GOOGLE_AUTH,
+  ROUTE_AUTH_LOGIN,
+  ROUTE_AUTH_REFRESH_TOKEN,
+  ROUTE_AUTH_REGISTER,
+  ROUTE_AUTH_VERIFY_EMAIL,
+  ROUTE_COMPLETE_PROFILE,
+  ROUTE_ME,
+} from "../../../utils/page-routes";
 
 const router = Router();
 
-router.post('/auth/register', validate(createParticipantSchema),createUser);
-router.post('/auth/login', validate(loginParticipantSchema),loginUser);
-router.get('/auth/verify-email', verifyEmail);
-router.post('/auth/google-auth', googleAuth);
-router.get('/me', authMiddleware, getUser);
+router.post(ROUTE_AUTH_REGISTER, validate(createParticipantSchema), createUser);
+router.post(ROUTE_AUTH_LOGIN, validate(loginParticipantSchema), loginUser);
+router.get(ROUTE_AUTH_VERIFY_EMAIL, verifyEmail);
+router.post(ROUTE_AUTH_GOOGLE_AUTH, validate(googleAuthSchema), googleAuth);
+router.get(ROUTE_AUTH_REFRESH_TOKEN, getRefreshToken);
+router.get(ROUTE_ME, authMiddleware, getUser);
+router.post(
+  ROUTE_COMPLETE_PROFILE,
+  validate(completeProfileSchema),
+  authMiddleware,
+  completeProfile
+);
 
 export default router;

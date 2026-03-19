@@ -6,7 +6,8 @@ const envSchema = z.object({
   PORT: z.string().default('5000'),
   NODE_ENV: z.enum(['development', 'production', 'test']),
   MONGO_URL: z.string(),
-  JWT_SECRET: z.string(),
+  REFRESH_SECRET: z.string(),
+  ACCESS_SECRET: z.string(),
   REDIS_URL: z.string().optional(),
 });
 
