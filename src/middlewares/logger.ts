@@ -1,6 +1,7 @@
 import { createLogger, format, transports } from "winston";
 import path from "path";
 import dotenv from "dotenv";
+import { env } from "../config";
 
 const { combine, timestamp, json, errors } = format;
 
@@ -8,13 +9,13 @@ const { combine, timestamp, json, errors } = format;
 dotenv.config({
   path: path.join(
     process.cwd(),
-    `configs/envs/.env.${process.env.NODE_ENV}`
+    `configs/envs/.env.${env.NODE_ENV}`
   ),
 });
 
 let AppLogger: any;
 
-if (process.env.NODE_ENV === "test") {
+if (env.NODE_ENV === "test") {
   /**
    * For testing, disable logs
    */
@@ -42,7 +43,7 @@ if (process.env.NODE_ENV === "test") {
   // database transport options
   const dbOptions = {
     level: "error",
-    db: process.env.MONGO_URI,
+    db: env.MONGO_URL,
     options: {
       useUnifiedTopology: true,
       useNewUrlParser: true,

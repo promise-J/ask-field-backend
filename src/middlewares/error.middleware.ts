@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { env } from '../config';
 
 export function errorMiddleware(
   err: any,
@@ -11,6 +12,6 @@ export function errorMiddleware(
   res.status(statusCode).json({
     success: false,
     message: err.message || 'Internal Server Error',
-    stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,
+    stack: env.NODE_ENV === 'production' ? undefined : err.stack,
   });
 }

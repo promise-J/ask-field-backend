@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import { env } from "../config";
 
 const AppLogger = require("../middlewares/logger");
 const Auth0Error = require("./auth0Error");
@@ -59,7 +60,7 @@ export default (err: any, req: Request, res: Response, next: NextFunction) => {
     err.statusCode = err.statusCode || err.status || 500;
     err.status = err.status || "error";
 
-    if (process.env.NODE_ENV === "development") {
+    if (env.NODE_ENV === "development") {
         sendDevelopmentError(err, res);
     } else {
         let error = Object.create(err, Object.getOwnPropertyDescriptors(err));

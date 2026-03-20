@@ -1,4 +1,5 @@
 import axios from "axios";
+import { env } from "../../config";
 
 const sendEmail = async ({ to, subject = "New Mail", html }: {to: string; subject: string; html: string}) => {
   try {
@@ -16,8 +17,8 @@ const sendEmail = async ({ to, subject = "New Mail", html }: {to: string; subjec
       "https://api.brevo.com/v3/smtp/email",
       {
         sender: {
-          email: process.env.EMAIL_FROM,
-          name: process.env.APP_NAME || "My App",
+          email: env.EMAIL_FROM,
+          name: env.APP_NAME || "My App",
         },
         to: [{ email: to }],
         subject,
@@ -25,7 +26,7 @@ const sendEmail = async ({ to, subject = "New Mail", html }: {to: string; subjec
       },
       {
         headers: {
-          "api-key": process.env.BREVO_API_KEY,
+          "api-key": env.BREVO_API_KEY,
           "Content-Type": "application/json",
         },
       }

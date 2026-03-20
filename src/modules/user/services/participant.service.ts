@@ -7,6 +7,7 @@ import admin from "../../../firebaseAdmin";
 import { ParticipantProfileRepository } from "../repositories/participant.profile.repository";
 import { signAccessToken, verifyRefreshToken } from "../../../utils/jwt";
 import { JwtPayload } from "jsonwebtoken";
+import { env } from "../../../config";
 
 type LoginUserReq = { email: string; password: string };
 
@@ -71,7 +72,7 @@ export class ParticipantService {
         });
       }
 
-      const baseFrontendUrl = process.env.FRONTEND_BASE_URL || "";
+      const baseFrontendUrl = env.FRONTEND_BASE_URL || "";
       const verificationUrl = `${baseFrontendUrl}/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(
         data.email
       )}`;
@@ -133,7 +134,7 @@ export class ParticipantService {
         (userExists.verificationToken = verificationToken),
           (userExists.verificationTokenExpires = verificationTokenExpires);
 
-        const baseFrontendUrl = process.env.FRONTEND_BASE_URL || "";
+        const baseFrontendUrl = env.FRONTEND_BASE_URL || "";
         const verificationUrl = `${baseFrontendUrl}/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(
           data.email
         )}`;
@@ -216,7 +217,7 @@ export class ParticipantService {
       await user.save();
 
       return serviceResponse(true, "Email verified successfully", {
-        redirectUrl: `${process.env.FRONTEND_BASE_URL}/waitlist?verified=true`,
+        redirectUrl: `${env.FRONTEND_BASE_URL}/waitlist?verified=true`,
       });
     } catch (error) {
       console.log(error, "the get user");
