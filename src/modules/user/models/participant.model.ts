@@ -11,6 +11,8 @@ export interface IParticipant extends Document {
   isVerified: boolean;
   verificationToken?: string;
   verificationTokenExpires: Date | null;
+  otp?: string;
+  otpExpires: Date | null;
   isOnBoardingComplete: boolean;
   signupPlatform: 'email' | 'google';
   receivesUpdates: boolean;
@@ -33,13 +35,15 @@ export interface IParticipant extends Document {
 
 const participantSchema = new Schema<IParticipant>(
   {
-    email: { type: String, required: true, unique: true, trim: true },
+    email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     password: { type: String, trim: true },
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
     isVerified: { type: Boolean, default: false },
     verificationToken: { type: String },
     verificationTokenExpires: {type: Date},
+    otp: { type: String },
+    otpExpires: {type: Date},
     isOnBoardingComplete: { type: Boolean, default: false },
     signupPlatform: { type: String, enum: ["email", "google"], default: "email" },
     receivesUpdates: { type: Boolean, default: false },
@@ -95,7 +99,7 @@ participantSchema.pre("save", async function (next) {
         userType: this.userType,
       },
       env.ACCESS_SECRET || '',
-      { expiresIn: "1m" }
+      { expiresIn: "1h" }
     );
     return token;
   };

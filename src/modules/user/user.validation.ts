@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const createParticipantSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
   firstName: z.string().nonempty('First name is required'),
   lastName: z.string().min(5),
   signupPlatform: z.enum(['email', 'google']).default('email'),
@@ -10,17 +10,30 @@ export const createParticipantSchema = z.object({
 });
 export const loginParticipantSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
 
 export const verifyEmailQuerySchema = z.object({
   email: z.string().email(),
-  token: z.string().min(10, "Invalid token"), // adjust min length based on your token generation
+  token: z.string().min(20, "Invalid token"), // adjust min length based on your token generation
 });
 
 export const googleAuthSchema = z.object({
   token: z.string().min(10, "Invalid token"),
+})
+
+export const sendOtpSchema = z.object({
+  email: z.string().email(),
+})
+export const verifyOtpSchema = z.object({
+  email: z.string().email(),
+  code: z.string().min(6, "Invalid token"),
+})
+export const resetPasswordSchema = z.object({
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  email: z.string().email(),
+  token: z.string().min(10, "Invalid token"), // adjust min length based on your token generation
 })
 
 export const completeProfileSchema = z.object({

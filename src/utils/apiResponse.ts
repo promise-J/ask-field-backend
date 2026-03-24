@@ -14,7 +14,7 @@ export function apiSuccessResponse(
   }
 
 export function apiFailureResponse(
-    res: any,
+    res: Response,
     error = '',
     statusCode = 400,
   ) {

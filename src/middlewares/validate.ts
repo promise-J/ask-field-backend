@@ -19,13 +19,13 @@ export const validate = (schema: ZodSchema<any>) => {
         // Return only the first error
         return res.status(400).json({
           success: false,
-          message: messages[0]
+          error: messages[0]
         });
       }
 
       return res.status(400).json({
         success: false,
-        message: "Something went wrong.",
+        error: "Something went wrong.",
       });
     }
   };

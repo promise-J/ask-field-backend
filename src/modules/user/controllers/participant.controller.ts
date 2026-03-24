@@ -74,3 +74,34 @@ export const getRefreshToken = asyncHandler(
     return apiSuccessResponse(res, response.message, response.data)
   }
 )
+
+export const sendOtp = asyncHandler(
+  async (req: Request, res: Response)=>{
+    const response = await participantService.sendOtp(req)
+    if(!response.success){
+      return apiFailureResponse(res, response.message)
+    }
+    return apiSuccessResponse(res, response.message, response.data)
+  }
+)
+
+export const verifyOtp = asyncHandler(
+  async (req: Request, res: Response)=>{
+    const response = await participantService.verifyOtp(req)
+    if(!response.success){
+      return apiFailureResponse(res, response.message)
+    }
+    return apiSuccessResponse(res, response.message, response.data)
+  }
+)
+
+export const resetPassword = asyncHandler(
+  async (req: Request, res: Response)=>{
+    const response = await participantService.resetPassword(req)
+    console.log({response})
+    if(!response.success){
+      return apiFailureResponse(res, response.message)
+    }
+    return apiSuccessResponse(res, response.message, response.data)
+  }
+)
