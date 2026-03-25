@@ -13,7 +13,6 @@ export interface IParticipant extends Document {
   verificationTokenExpires: Date | null;
   otp?: string;
   otpExpires: Date | null;
-  isOnBoardingComplete: boolean;
   signupPlatform: 'email' | 'google';
   receivesUpdates: boolean;
   image?: {
@@ -44,7 +43,6 @@ const participantSchema = new Schema<IParticipant>(
     verificationTokenExpires: {type: Date},
     otp: { type: String },
     otpExpires: {type: Date},
-    isOnBoardingComplete: { type: Boolean, default: false },
     signupPlatform: { type: String, enum: ["email", "google"], default: "email" },
     receivesUpdates: { type: Boolean, default: false },
     googleId: { type: String, unique: true, sparse: true },

@@ -81,7 +81,7 @@ export class ParticipantService {
       const emailHtml = `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; padding: 30px; text-align: center;">
             <h1 style="color: #111827; font-size: 24px; margin-bottom: 10px;">Verify Your Email</h1>
-            <p style="color: #4b5563; font-size: 16px;">Hi <strong>${data.email}</strong>,</p>
+            <p style="color: #4b5563; font-size: 16px;">Hi <strong>${data.firstName}</strong>,</p>
             <p style="color: #6b7280; line-height: 1.6;">
               Welcome! Please click the button below to verify your email address and activate your account.
             </p>
