@@ -79,7 +79,7 @@ export class ResearcherService {
 
       // Send email
       await sendEmail({
-        subject: "Verify Your Email",
+        subject: "Welcome to Ask Field",
         to: data.email,
         html: emailHtml,
       });
@@ -98,14 +98,92 @@ export class ResearcherService {
   }
   async loginUser(data: any) {
     try {
-      const exists = await researcherRepo.findByEmail(data.email);
-      if (exists) {
-        return serviceResponse(false, "User already exists");
+      const userExists = await researcherRepo.findByEmail(data.email);
+      if (!userExists) {
+        return serviceResponse(
+          false,
+          "You are not registered. Please register"
+        );
       }
 
-      const hashedPassword = await bcrypt.hash(data.password, 10);
+      if (userExists.signupPlatform === "google") {
+        // If the user signed up via Google, prevent local login attempt
+        if (data.password) {
+          return serviceResponse(
+            false,
+            "This account was created using Google. Please log in using Google."
+          );
+        }
+      }
 
-      return serviceResponse(true, "success");
+      if (!userExists.isVerified) {
+        const verificationToken = crypto.randomBytes(32).toString("hex");
+        const verificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);
+
+        (userExists.verificationToken = verificationToken),
+          (userExists.verificationTokenExpires = verificationTokenExpires);
+
+        const baseFrontendUrl = env.FRONTEND_BASE_URL || "";
+        const verificationUrl = `${baseFrontendUrl}/auth/researcher/verify-email?token=${verificationToken}&email=${encodeURIComponent(
+          data.email
+        )}`;
+
+        const emailHtml = `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; padding: 30px; text-align: center;">
+            <h1 style="color: #111827; font-size: 24px; margin-bottom: 10px;">Verify Your Email</h1>
+            <p style="color: #4b5563; font-size: 16px;">Hi <strong>${data.firstName}</strong>,</p>
+            <p style="color: #6b7280; line-height: 1.6;">
+              Welcome! Please click the button below to login to start creating surveys.
+            </p>
+            
+            <div style="margin: 30px 0;">
+              <a href="${verificationUrl}" 
+                style="background-color: #facc15; color: #000; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">
+                Continue Here
+              </a>
+            </div>
+
+            <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">
+              This link will expire in <strong>15 minutes</strong>. <br/>
+              If you did not create an account, you can safely ignore this email.
+            </p>
+            
+            <hr style="border: none; border-top: 1px solid #f3f4f6; margin: 25px 0;" />
+            
+            <p style="color: #9ca3af; font-size: 11px;">
+              If the button above doesn't work, copy and paste this link into your browser: <br/>
+              <span style="color: #3b82f6;">${verificationUrl}</span>
+            </p>
+          </div>
+        `;
+
+
+        // Send email
+
+        await sendEmail({
+          subject: "Welcome to Ask",
+          to: data.email,
+          html: emailHtml,
+        });
+
+        return serviceResponse(
+          false,
+          "User is not verified. An email has been sent to you"
+        );
+      }
+
+      if (!(await userExists.comparePassword(data.password))) {
+        return serviceResponse(false, "Wrong email or password");
+      }
+
+      const accessToken = await userExists.generateAccessToken();
+      const refreshToken = await userExists.generateRefreshToken();
+
+      return serviceResponse(true, "Login Successful.", {
+        user: userExists,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      });
     } catch (error) {
       return serviceResponse(
         false,
@@ -152,7 +230,7 @@ export class ResearcherService {
         await user.save();
   
         return serviceResponse(true, "Email verified successfully", {
-          redirectUrl: `${env.FRONTEND_BASE_URL}/auth/login`,
+          redirectUrl: `${env.FRONTEND_BASE_URL}/auth/login/researcher`,
         });
       } catch (error) {
         console.log(error, "the get user");
@@ -163,9 +241,22 @@ export class ResearcherService {
       }
     }
 
-  async getUser(id: string) {
-    const user = await researcherRepo.findById(id);
-    if (!user) throw new Error("User not found");
-    return user;
-  }
+  async getUser(req: Request) {
+     try {
+       const userId = req.user?.id || "";
+ 
+       if (!req.user || !req.user.id) {
+         return serviceResponse(false, "Unauthorized: No user found in request");
+       }
+ 
+       const user = await researcherRepo.findById(userId);
+       if (!user) return serviceResponse(false, "User is not found");
+       return serviceResponse(true, "User fetched successfully", user);
+     } catch (error) {
+       return serviceResponse(
+         false,
+         "Something went wrong. Please try again later"
+       );
+     }
+   }
 }
