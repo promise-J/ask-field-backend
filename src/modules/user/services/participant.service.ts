@@ -9,6 +9,7 @@ import { signAccessToken, verifyRefreshToken } from "../../../utils/jwt";
 import { JwtPayload } from "jsonwebtoken";
 import { env } from "../../../config";
 import { generateOTP } from "../../../utils/helper";
+import { ResearcherRepository } from "../repositories/researcher.repository";
 
 type LoginUserReq = { email: string; password: string };
 
@@ -44,13 +45,18 @@ type CompleteProfileReq = {
 };
 
 const participantRepo = new ParticipantRepository();
+const researcherRepo = new ResearcherRepository();
 const participantProfileRepo = new ParticipantProfileRepository();
 
 export class ParticipantService {
   async createUser(data: CreateUserReq) {
     try {
       let user = await participantRepo.findByEmail(data.email);
+      const researcherUser = await researcherRepo.findByEmail(data.email);
 
+      if (researcherUser) {
+        return serviceResponse(false, "User already exists");
+      }
       if (user && user.isVerified) {
         return serviceResponse(false, "User already exists");
       }
@@ -58,6 +64,7 @@ export class ParticipantService {
       const verificationToken = crypto.randomBytes(32).toString("hex");
       const verificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);
 
+      
       if (user && !user.isVerified) {
         user.password = data.password;
         user.firstName = data.firstName;

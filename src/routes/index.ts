@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import participantRoutes from '../modules/user/routes/participant.routes';
-import researcherRoutes from '../modules/user/routes/researcher.routes';
+import researcherRoutes from '../modules/user/routes/researcher.route';
 
 const router = Router();
 

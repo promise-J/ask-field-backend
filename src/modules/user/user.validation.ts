@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+
+//Participants
 export const createParticipantSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -8,6 +10,7 @@ export const createParticipantSchema = z.object({
   signupPlatform: z.enum(['email', 'google']).default('email'),
   receivesUpdates: z.boolean().default(false),
 });
+
 export const loginParticipantSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -56,4 +59,22 @@ export const completeProfileSchema = z.object({
   payPerHour: z.string().min(1, "Pay per hour is required"),
   workHour: z.string().min(1, "Work hours are required"),
   shareLinkedin: z.string().min(1, "LinkedIn preference is required"),
+});
+
+//Researcher
+export const createResearcherSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  firstName: z.string().nonempty('First name is required'),
+  lastName: z.string().min(5),
+  signupPlatform: z.enum(['email', 'google']).default('email'),
+  jobTitle: z.string().min(3),
+  organizationType: z.string().min(3),
+  organizationName: z.string().min(3),
+  country: z.string().min(3),
+});
+
+export const loginResearcherSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
 });

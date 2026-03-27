@@ -1,15 +1,15 @@
 import { ResearcherModel } from '../models/researcher.model';
 
 export class ResearcherRepository {
-  create(data: any) {
-    return ResearcherModel.create(data);
+  async create(data: any) {
+    return await ResearcherModel.create(data);
   }
 
-  findByEmail(email: string) {
-    return ResearcherModel.findOne({ email });
+  async findByEmail(email: string) {
+    return await ResearcherModel.findOne({ email });
   }
 
-  findById(id: string) {
-    return ResearcherModel.findById(id);
+  async findById(id: string) {
+    return await ResearcherModel.findById(id);
   }
 }
