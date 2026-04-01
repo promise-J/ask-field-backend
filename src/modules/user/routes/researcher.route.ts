@@ -7,7 +7,7 @@ import {
   loginParticipantSchema,
   loginResearcherSchema,
 } from "../user.validation";
-import { authMiddleware } from "../../../middlewares/auth.middleware";
+import { authMiddleware } from "../../../middlewares/auth/auth.middleware";
 import {
   ROUTE_AUTH_LOGIN,
   ROUTE_AUTH_REGISTER,

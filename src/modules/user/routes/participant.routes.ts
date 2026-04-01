@@ -21,7 +21,7 @@ import {
   sendOtpSchema,
   verifyOtpSchema,
 } from "../user.validation";
-import { authMiddleware } from "../../../middlewares/auth.middleware";
+import { authMiddleware } from "../../../middlewares/auth/auth.middleware";
 import {
   ROUTE_AUTH_GOOGLE_AUTH,
   ROUTE_AUTH_LOGIN,

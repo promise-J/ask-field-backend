@@ -9,3 +9,9 @@ export const ROUTE_AUTH_VERIFY_OTP = '/auth/verify-otp'
 export const ROUTE_RESET_PASSWORD = '/auth/reset-password'
 export const ROUTE_ME = '/me'
 export const ROUTE_COMPLETE_PROFILE = '/auth/complete-profile'
+
+//survey
+export const ROUTE_CREATE_SURVEY = '/create-survey'
+
+//seed
+export const ROUTE_SEED_ALL = '/seed-all'
