@@ -10,6 +10,8 @@ import { requestLogger } from './middlewares/requestLogger.middleware';
 import errorController from './error-helpers/error.controller';
 import AppError from './error-helpers/appError';
 
+import swaggerUi from 'swagger-ui-express';
+import { swaggerDocument } from './config/swagger/swagger';
 
 
 const app = express();
@@ -23,6 +25,7 @@ app.use(express.json());
 app.use(morgan('dev'));
 app.use(rateLimiter);
 
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use('/api', routes);
 
 app.get("/", async(req, res) => {

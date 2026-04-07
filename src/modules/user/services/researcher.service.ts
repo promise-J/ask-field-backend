@@ -1,10 +1,8 @@
-import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { ResearcherRepository } from "../repositories/researcher.repository";
 import { serviceResponse } from "../../../utils/apiResponse";
 import { ParticipantRepository } from "../repositories/participant.repository";
 import sendEmail from "../../../shared/services/emailService";
-import { readSync } from "fs";
 import { env } from "../../../config";
 import { Request } from "express";
 

@@ -19,6 +19,7 @@ import {
   loginParticipantSchema,
   resetPasswordSchema,
   sendOtpSchema,
+  verifyEmailQuerySchema,
   verifyOtpSchema,
 } from "../user.validation";
 import { authMiddleware } from "../../../middlewares/auth/auth.middleware";
@@ -39,7 +40,7 @@ const router = Router();
 
 router.post(ROUTE_AUTH_REGISTER, validate(createParticipantSchema), createUser);
 router.post(ROUTE_AUTH_LOGIN, validate(loginParticipantSchema), loginUser);
-router.get(ROUTE_AUTH_VERIFY_EMAIL, verifyEmail);
+router.get(ROUTE_AUTH_VERIFY_EMAIL, validate(verifyEmailQuerySchema), verifyEmail);
 router.post(ROUTE_AUTH_GOOGLE_AUTH, validate(googleAuthSchema), googleAuth);
 router.get(ROUTE_AUTH_REFRESH_TOKEN, getRefreshToken);
 router.post(ROUTE_AUTH_SEND_OTP, validate(sendOtpSchema),sendOtp);

@@ -548,7 +548,6 @@ export class ParticipantService {
   async verifyOtp(req: Request) {
     try {
       const { code, email } = req.body;
-      console.log({code, email})
       const user = await participantRepo.findByEmail(email)
 
       if(!user){
