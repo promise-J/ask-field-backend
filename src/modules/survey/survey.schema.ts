@@ -23,6 +23,7 @@ export const surveySchemaAPI = {
       numberOfParticipants: { type: "number" },
       howToScreenParticipants: { type: "string" },
       surveyDistribution: { type: "string" },
+      status: { type: "string" },
       surveyCrendentials: { type: "string" },
       totalSubmission: { type: "number" },
       inputRejection: { type: "number" },
@@ -53,4 +54,11 @@ export const surveySchemaAPI = {
       "surveyDuration",
       "surveyAmount",
     ],
-  };
+};
+
+export const createDraftSurveySchemaAPI = {
+  type: "object",
+  properties: {
+    projectId: { type: "string", pattern: "^[0-9a-fA-F]{24}$", example: "60c72b2f9b1d8e5a5c8f9e7a" },
+  }
+}

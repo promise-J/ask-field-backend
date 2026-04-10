@@ -121,4 +121,40 @@ export const researcherPaths = {
       },
     },
   },
+  "/researchers/dashboard-stats": {
+    get: {
+      tags: ["Researchers"],
+      summary: "Get dashboard stats for the researcher",
+      // parameters: [
+      //   {
+      //     name: "Authorization",
+      //     in: "header",
+      //     required: true,
+      //     schema: { type: "string", example: "Bearer <access_token>" },
+      //   },
+      // ],
+      responses: {
+        200: {
+          description: "Dashboard stats fetched successfully",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  message: {
+                    type: "string",
+                    example: "Dashboard stats fetched successfully",
+                  },
+                  data: { $ref: "#/components/schemas/DashboardStats" },
+                },
+              },
+            },
+          },
+        },
+        400: {
+          description: "Error fetching dashboard stats",
+        },
+      },
+    },
+  },
 };

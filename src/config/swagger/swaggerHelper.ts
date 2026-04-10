@@ -1,4 +1,5 @@
-import { surveySchemaAPI } from "../../modules/survey/survey.schema";
+import { CreateProjectSchemaAPI, ProjectSchemaAPI } from "../../modules/project/project.schema";
+import { createDraftSurveySchemaAPI, surveySchemaAPI } from "../../modules/survey/survey.schema";
 import {
   CreateParticipantSchemaAPI,
   googleAuthSchemaAPI,
@@ -10,6 +11,7 @@ import {
 } from "../../modules/user/schemas/participant.schema";
 import {
   CreateResearcherSchemaAPI,
+  dashboardStatsSchemaAPI,
   loginResearcherSchemaAPI,
   ResearcherSchemaAPI,
 } from "../../modules/user/schemas/researcher.schema";
@@ -28,8 +30,14 @@ export const allSwaggerSchema = {
   Researcher: ResearcherSchemaAPI,
   CreateResearcher: CreateResearcherSchemaAPI,
   LoginResearcher: loginResearcherSchemaAPI,
+  DashboardStats: dashboardStatsSchemaAPI,
 
 
   //   Survey
-  Survey: surveySchemaAPI
+  Survey: surveySchemaAPI,
+  CreateDraftSurvey: createDraftSurveySchemaAPI,
+
+  //   Projects
+  Project: ProjectSchemaAPI,
+  CreateProject: CreateProjectSchemaAPI,
 };

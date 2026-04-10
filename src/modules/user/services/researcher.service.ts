@@ -17,6 +17,14 @@ type CreateUserReq = {
   signupPlatform: string;
 };
 
+interface SurveyResponse {
+  activeSurveys: number;
+  liveSurveys: number;
+  draftSurveys: number;
+  closedSurveys: number;
+  researchSpent: number;
+}
+
 export class ResearcherService {
   async createUser(data: CreateUserReq) {
     try {
@@ -250,6 +258,34 @@ export class ResearcherService {
        const user = await researcherRepo.findById(userId);
        if (!user) return serviceResponse(false, "User is not found");
        return serviceResponse(true, "User fetched successfully", user);
+     } catch (error) {
+       return serviceResponse(
+         false,
+         "Something went wrong. Please try again later"
+       );
+     }
+   }
+  async researcherDashboardStats(req: Request) {
+     try {
+       const userId = req.user?.id || "";
+ 
+       if (!req.user || !req.user.id) {
+         return serviceResponse(false, "Unauthorized: No user found in request");
+       }
+ 
+       const user = await researcherRepo.findById(userId);
+       if (!user) return serviceResponse(false, "User is not found");
+
+      
+      const response = {} as SurveyResponse; 
+
+       response['activeSurveys'] = 120;
+       response['liveSurveys'] = 30;
+       response['draftSurveys'] = 60;
+       response['closedSurveys'] = 30;
+       response['researchSpent'] = 56700;
+
+       return serviceResponse(true, "User fetched successfully", response);
      } catch (error) {
        return serviceResponse(
          false,

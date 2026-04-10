@@ -1,3 +1,4 @@
+import { projectPaths } from "../../modules/project/project.openapi";
 import { surveyPaths } from "../../modules/survey/survey.openapi";
 import { participantPaths } from "../../modules/user/routes/openapi/participant.openapi";
 import { researcherPaths } from "../../modules/user/routes/openapi/researcher.openapi";
@@ -11,11 +12,12 @@ export const swaggerDocument = {
     version: '1.0.0',
     description: 'API Documentation',
   },
-  servers: [{ url: 'https://askfield-backend2.onrender.com/api' }],
+  servers: [{ url: 'https://ask-field-backend.onrender.com/api' }],
   paths: {
     ...participantPaths,
     ...researcherPaths,
     ...surveyPaths,
+    ...projectPaths,
     // add other modules here
   },
   components: {

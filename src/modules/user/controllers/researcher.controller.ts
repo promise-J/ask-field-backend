@@ -38,3 +38,11 @@ export const getUser = asyncHandler(async (req: Request, res: Response) => {
   }
   return apiSuccessResponse(res, response.message, response.data, 201);
 });
+
+export const researcherDashboardStats = asyncHandler(async (req: Request, res: Response) => {
+  const response = await researcherService.researcherDashboardStats(req);
+  if (!response.success) {
+    return apiFailureResponse(res, response.message);
+  }
+  return apiSuccessResponse(res, response.message, response.data, 201);
+});

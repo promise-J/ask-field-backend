@@ -10,7 +10,17 @@ export class SurveyRepository {
     return await SurveyModel.findById(id);
   }
 
+  async updateOne(query: any, data: any, options: any) {
+    return await SurveyModel.findById(query, data, options);
+  }
+
+  async find(query: any) {
+    return await SurveyModel.find(query);
+  }
   async findOne(query: any) {
     return await SurveyModel.findOne(query);
+  }
+  async deleteOne(query: any) {
+    return await SurveyModel.findOneAndDelete(query);
   }
 }

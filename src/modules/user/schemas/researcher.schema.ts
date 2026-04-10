@@ -1,69 +1,92 @@
 import z from "zod";
 
-
 export const ResearcherSchemaAPI = {
-  type: 'object',
+  type: "object",
   properties: {
-    email: { type: 'string', format: 'email' },
-    password: { type: 'string', minLength: 8 },
-    firstName: { type: 'string' },
-    lastName: { type: 'string' },
-    isVerified: { type: 'boolean', default: false },
-    verificationToken: { type: 'string' },
-    verificationTokenExpires: { type: 'string', format: 'date-time', nullable: true },
-    otp: { type: 'string' },
-    otpExpires: { type: 'string', format: 'date-time', nullable: true },
-    signupPlatform: { type: 'string', enum: ['email', 'google'], default: 'email' },
+    email: { type: "string", format: "email" },
+    password: { type: "string", minLength: 8 },
+    firstName: { type: "string" },
+    lastName: { type: "string" },
+    isVerified: { type: "boolean", default: false },
+    verificationToken: { type: "string" },
+    verificationTokenExpires: {
+      type: "string",
+      format: "date-time",
+      nullable: true,
+    },
+    otp: { type: "string" },
+    otpExpires: { type: "string", format: "date-time", nullable: true },
+    signupPlatform: {
+      type: "string",
+      enum: ["email", "google"],
+      default: "email",
+    },
     image: {
-      type: 'object',
+      type: "object",
       properties: {
-        imageUrl: { type: 'string', format: 'uri' },
-        publicId: { type: 'string' },
+        imageUrl: { type: "string", format: "uri" },
+        publicId: { type: "string" },
       },
       required: [],
     },
-    googleId: { type: 'string' },
-    subscriptionStatus: { type: 'string' },
-    subscriptionExpiry: { type: 'string', format: 'date-time' },
-    userType: { type: 'string' },
-    isCompleteProfile: { type: 'boolean', default: false },
-    jobTitle: { type: 'string' },
-    organizationType: { type: 'string' },
-    organizationName: { type: 'string' },
-    country: { type: 'string' },
+    googleId: { type: "string" },
+    subscriptionStatus: { type: "string" },
+    subscriptionExpiry: { type: "string", format: "date-time" },
+    userType: { type: "string" },
+    isCompleteProfile: { type: "boolean", default: false },
+    jobTitle: { type: "string" },
+    organizationType: { type: "string" },
+    organizationName: { type: "string" },
+    country: { type: "string" },
   },
   required: [
-    'email',
-    'password',
-    'firstName',
-    'lastName',
-    'isVerified',
-    'signupPlatform',
-    'isCompleteProfile',
-    'jobTitle',
-    'organizationType',
-    'organizationName',
-    'country',
+    "email",
+    "password",
+    "firstName",
+    "lastName",
+    "isVerified",
+    "signupPlatform",
+    "isCompleteProfile",
+    "jobTitle",
+    "organizationType",
+    "organizationName",
+    "country",
   ],
 };
 
 export const CreateResearcherSchemaAPI = {
-    type: 'object',
-    properties: {
-      email: { type: 'string', format: 'email' },
-      password: { type: 'string', minLength: 8 },
-      firstName: { type: 'string' },
-      lastName: { type: 'string', minLength: 5 },
-      signupPlatform: { type: 'string', enum: ['email', 'google'], default: 'email' },
+  type: "object",
+  properties: {
+    email: { type: "string", format: "email" },
+    password: { type: "string", minLength: 8 },
+    firstName: { type: "string" },
+    lastName: { type: "string", minLength: 5 },
+    signupPlatform: {
+      type: "string",
+      enum: ["email", "google"],
+      default: "email",
     },
-    required: ['email', 'password', 'firstName', 'lastName'],
-  };
+  },
+  required: ["email", "password", "firstName", "lastName"],
+};
 
 export const loginResearcherSchemaAPI = {
   type: "object",
   properties: {
     email: { type: "string", format: "email" },
     password: { type: "string", minLength: 8 },
+  },
+  required: ["email", "password"],
+};
+
+export const dashboardStatsSchemaAPI = {
+  type: "object",
+  properties: {
+    activeSurveys: { type: "number", format: "number", example: 120 },
+    liveSurveys: { type: "number", format: "number", example: 30 },
+    draftSurveys: { type: "number", format: "number", example: 60 },
+    closedSurveys: { type: "number", format: "number", example: 30 },
+    researchSpent: { type: "number", format: "number", example: 56700 },
   },
   required: ["email", "password"],
 };
