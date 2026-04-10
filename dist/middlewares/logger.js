@@ -6,13 +6,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const winston_1 = require("winston");
 const path_1 = __importDefault(require("path"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const config_1 = require("../config");
 const { combine, timestamp, json, errors } = winston_1.format;
 // Load environment variables
 dotenv_1.default.config({
-    path: path_1.default.join(process.cwd(), `configs/envs/.env.${process.env.NODE_ENV}`),
+    path: path_1.default.join(process.cwd(), `configs/envs/.env.${config_1.env.NODE_ENV}`),
 });
 let AppLogger;
-if (process.env.NODE_ENV === "test") {
+if (config_1.env.NODE_ENV === "test") {
     /**
      * For testing, disable logs
      */
@@ -40,7 +41,7 @@ else {
     // database transport options
     const dbOptions = {
         level: "error",
-        db: process.env.MONGO_URI,
+        db: config_1.env.MONGO_URL,
         options: {
             useUnifiedTopology: true,
             useNewUrlParser: true,

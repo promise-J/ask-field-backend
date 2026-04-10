@@ -10,9 +10,9 @@ function apiSuccessResponse(res, message = 'Success', data, statusCode = 200) {
         data,
     });
 }
-function apiFailureResponse(res, error = '', statusCode = 401) {
+function apiFailureResponse(res, error = '', statusCode = 400) {
     return res.status(statusCode).json({
-        success: true,
+        success: false,
         error
     });
 }

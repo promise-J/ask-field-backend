@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const config_1 = require("../config");
 const AppLogger = require("../middlewares/logger");
 const Auth0Error = require("./auth0Error");
 const MongoDBError = require("./mongoDBError");
@@ -55,7 +56,7 @@ exports.default = (err, req, res, next) => {
     // in dev mode, we will have all details but in production mode, this will give at least the right status code
     err.statusCode = err.statusCode || err.status || 500;
     err.status = err.status || "error";
-    if (process.env.NODE_ENV === "development") {
+    if (config_1.env.NODE_ENV === "development") {
         sendDevelopmentError(err, res);
     }
     else {
