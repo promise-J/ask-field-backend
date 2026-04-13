@@ -2,7 +2,7 @@ import { projectPaths } from "../../modules/project/project.openapi";
 import { surveyPaths } from "../../modules/survey/survey.openapi";
 import { participantPaths } from "../../modules/user/routes/openapi/participant.openapi";
 import { researcherPaths } from "../../modules/user/routes/openapi/researcher.openapi";
-import { allSwaggerSchema } from "./swaggerHelper";
+import { allSwaggerSchema } from "./swaggerSchemaHelper";
 
 
 export const swaggerDocument = {

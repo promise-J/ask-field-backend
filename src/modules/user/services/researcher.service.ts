@@ -33,10 +33,10 @@ export class ResearcherService {
 
       
       if (user) {
-        return serviceResponse(false, "User exists alreay. Try another email");
+        return serviceResponse(false, "User exists already. Try another email");
       }
       if (participantExists) {
-        return serviceResponse(false, "User exists alreay. Try another email");
+        return serviceResponse(false, "User exists already. Try another email");
       }
 
       const verificationToken = crypto.randomBytes(32).toString("hex");
