@@ -52,7 +52,7 @@ const researcherSchema = new Schema<IResearcher>(
       default: "email",
     },
     googleId: { type: String, unique: true, sparse: true },
-    userType: { type: String, default: "participant" },
+    userType: { type: String, default: "researcher" },
     jobTitle: { type: String },
     organizationType: { type: String },
     organizationName: { type: String },
