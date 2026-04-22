@@ -12,12 +12,16 @@ import AppError from './error-helpers/appError';
 
 import swaggerUi from 'swagger-ui-express';
 import { swaggerDocument } from './config/swagger/swagger';
+import { stripeWebhookHandler } from './config/payment/stripeWebhook';
 
 
 const app = express();
 
 app.use(helmet());
 app.use(cors());
+
+// app.post("/webhook", express.raw({ type: "application/json" }), stripeWebhookHandler(require("stripe")(process.env.STRIPE_SECRET_KEY)));
+
 
 app.use(requestLogger);
 app.use(express.json());

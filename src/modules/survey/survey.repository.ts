@@ -10,8 +10,12 @@ export class SurveyRepository {
     return await SurveyModel.findById(id);
   }
 
-  async updateOne(query: any, data: any, options: any) {
-    return await SurveyModel.findById(query, data, options);
+  async updateOne(query: any, data: any, options?: any) {
+    return await SurveyModel.findOneAndUpdate(
+      query,
+      { $set: data },
+      { new: true, ...options }
+    );
   }
 
   async find(query: any) {

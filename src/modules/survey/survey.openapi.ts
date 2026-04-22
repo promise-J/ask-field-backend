@@ -244,48 +244,48 @@ export const surveyPaths = {
         },
       },
     },
-    "/surveys/update-draft-survey/:surveyId": {
-      put: {
-        tags: ["Surveys"],
-        summary: "Update a draft survey",
-        parameters: [
-          {
-            name: "surveyId",
-            in: "path",
-            required: true,
-            schema: { type: "string" },
-            description: "The ID of the draft survey to update",
-          },
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/Survey" },
-            },
-          },
-        },
-        responses: {
-          200: {
-            description: "Draft survey updated successfully",
-            content: {
-              "application/json": {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    message: {type: "string", example: "Draft survey updated successfully"},
-                    data: {
-                      $ref: '#/components/schemas/Survey'
-                    }
-                  }
-                },
-              },
-            },
-          },
-          400: {
-            description: "Error updating the draft survey",
-          },
-        },
-      },
-    },
+    // "/surveys/update-draft-survey/:surveyId": {
+    //   put: {
+    //     tags: ["Surveys"],
+    //     summary: "Update a draft survey",
+    //     parameters: [
+    //       {
+    //         name: "surveyId",
+    //         in: "path",
+    //         required: true,
+    //         schema: { type: "string" },
+    //         description: "The ID of the draft survey to update",
+    //       },
+    //     ],
+    //     requestBody: {
+    //       required: true,
+    //       content: {
+    //         "application/json": {
+    //           schema: { $ref: "#/components/schemas/Survey" },
+    //         },
+    //       },
+    //     },
+    //     responses: {
+    //       200: {
+    //         description: "Draft survey updated successfully",
+    //         content: {
+    //           "application/json": {
+    //             schema: {
+    //               type: 'object',
+    //               properties: {
+    //                 message: {type: "string", example: "Draft survey updated successfully"},
+    //                 data: {
+    //                   $ref: '#/components/schemas/Survey'
+    //                 }
+    //               }
+    //             },
+    //           },
+    //         },
+    //       },
+    //       400: {
+    //         description: "Error updating the draft survey",
+    //       },
+    //     },
+    //   },
+    // },
 }

@@ -64,14 +64,14 @@ export class SurveyService {
   }
   async updateDraftSurvey(surveyId: string, userId: string, data: Partial<CreateSurveyReq>) {
     try {
+      console.log(surveyId, data,'the survey')
       const survey = await surveyRepo.updateOne(
         {
           _id: surveyId,
           userId,
           status: "draft",
         },
-        data,
-        { new: true }
+        data
       );
   
       if (!survey) {
