@@ -24,6 +24,9 @@ export interface ISurvey extends Document {
   inputRejection?: number;
   surveyDuration?: number;
   surveyAmount?: number;
+  minimumAge?: number;
+  maximumAge?: number;
+  gender?: string;
   status?: 'draft' | 'published' | 'closed';
 }
 
@@ -36,7 +39,7 @@ const surveySchema = new Schema<ISurvey>(
     internalSurveyName: { type: String, trim: true },
     surveyDescription: { type: String, required: false, trim: true },
     surveyLabel: { type: String, required: false, trim: true },
-    usableDevices: { type: [String], default: [] },
+    usableDevices: { type: [String], default: [], enum: ['mobile', 'tablet', 'desktop'] },
     surveyEquipment: { type: String, trim: true },
     contentWarning: { type: String, trim: true },
     surveyURL: { type: String, trim: true },
@@ -52,6 +55,9 @@ const surveySchema = new Schema<ISurvey>(
     inputRejection: { type: Number, default: 0 },
     surveyDuration: { type: Number, default: 0 },
     surveyAmount: { type: Number, default: 0 },
+    minimumAge: { type: Number },
+    maximumAge: { type: Number},
+    gender: { type: String},
     status: { type: String, enum: ['draft', 'published', 'closed'], default: 'draft' },
   },
   { timestamps: true }

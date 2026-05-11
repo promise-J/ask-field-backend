@@ -1,6 +1,12 @@
+import { Request } from "express";
+import * as UAParser from 'ua-parser-js';
+
 import { serviceResponse } from "../../utils/apiResponse";
 import { SurveyRepository } from "./survey.repository";
 import z from "zod";
+import { ParticipantRepository } from "../user/repositories/participant.repository";
+import { ParticipantProfileRepository } from "../user/repositories/participant.profile.repository";
+import { getUserAge } from "../../utils/helper";
 
 type CreateSurveyReq = {
   userId: string;
@@ -35,10 +41,15 @@ type CreateSurveyReq = {
   inputRejection?: number;
   surveyDuration?: number;
   surveyAmount?: number;
+  mininumAge?: number;
+  maximumAge?: number;
+  gender?: string;
 };
 
 
 const surveyRepo = new SurveyRepository();
+const participantRepo = new ParticipantRepository();
+const participantProfileRepo = new ParticipantProfileRepository()
 
 export class SurveyService {
   async createDraftSurvey(userId: string, data: Partial<CreateSurveyReq>) {
@@ -151,7 +162,7 @@ export class SurveyService {
   }
   async getSurveysByProjectId(userId: string, projectId: string, status: string = "published") {
     try {
-      const filter = {userId, projectId, status}
+      const filter = {userId, projectId, status, surveyLabel: "survey"}
       const surveys = await surveyRepo.find(filter);
 
       return serviceResponse(
@@ -184,6 +195,84 @@ export class SurveyService {
         survey
       );
 
+    } catch (error) {
+      console.log(error);
+      return serviceResponse(
+        false,
+        "Something went wrong. Please try again later"
+      );
+    }
+  }
+  async checkEligibility(req: Request){
+    try {
+
+      const surveyId = req.params.surveyId;
+      const userId = req.user?.id;
+      // const parser = new UAParser(req.headers['user-agent']);
+      if(!surveyId){
+        return serviceResponse(
+          false,
+          "Survey ID is required."
+        );
+      }
+
+      const survey = await surveyRepo.findOne({_id: surveyId, status: "published"});
+      const user = await participantRepo.findById(userId || "");
+
+      const userProfile = await participantProfileRepo.findOne({userId: userId || ""});
+      if(!userProfile || userProfile.status !== "completed"){
+        return serviceResponse(
+          false,
+          "Please complete your profile before taking the survey."
+        );
+      }
+
+      if(!user){
+        return serviceResponse(
+          false,
+          "User not found."
+        );
+      }
+
+      if(!survey){
+        return serviceResponse(
+          false,
+          "Survey not found or not published yet."
+        );
+      }
+
+      const parser = new (UAParser as any)(req.headers['user-agent']);
+      const device = parser.getDevice();
+      // console.log(device.type);
+
+      if(survey.usableDevices && survey.usableDevices.length > 0 && device.type && !survey.usableDevices.includes(device.type)){
+        return serviceResponse(
+          false,
+          `This survey is only available on ${survey.usableDevices.join(", ")} devices.`
+        );
+      }
+
+      // if(userProfile.countryOfResidence !== survey.cou && survey.surveyDistribution === "international"){ add country later
+      // if(){
+      //   return serviceResponse(
+      //     false,
+      //     "This survey is only available for participants residing in specific countries."
+      //   );
+      // }
+
+      const userAge = getUserAge(userProfile.dob_year)
+
+      if((survey.minimumAge && userAge < survey.minimumAge) || (survey.maximumAge && userAge > survey.maximumAge)){
+        return serviceResponse(
+          false,
+          `This survey is only available for participants between ${survey.minimumAge} and ${survey.maximumAge} years old.`
+        );
+      }
+
+      return serviceResponse(
+        true,
+        "User is eligible to take the survey."
+      );
     } catch (error) {
       console.log(error);
       return serviceResponse(

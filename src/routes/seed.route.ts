@@ -3,7 +3,7 @@ import { ROUTE_SEED_ALL } from "../utils/page-routes";
 import { asyncHandler } from "../utils/asyncHandler";
 import { apiFailureResponse, apiSuccessResponse } from "../utils/apiResponse";
 import { ProjectModel } from "../modules/project/project.model";
-import { SurveyModel } from "../modules/survey/survey.model";
+import { SurveyModel } from "../modules/survey/models/survey.model";
 
 const router = Router();
 

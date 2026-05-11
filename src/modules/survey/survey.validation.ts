@@ -40,4 +40,7 @@ export const createSurveySchema = z.object({
   inputRejection: z.number().default(0),
   surveyDuration: z.number().default(0),
   surveyAmount: z.number().default(0),
+  minimumAge: z.number().optional(),
+  maximumAge: z.number().optional(),
+  gender: z.string().optional(),
 });

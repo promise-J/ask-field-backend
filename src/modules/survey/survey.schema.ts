@@ -29,6 +29,9 @@ export const surveySchemaAPI = {
       inputRejection: { type: "number" },
       surveyDuration: { type: "number" },
       surveyAmount: { type: "number" },
+      minimumAge: { type: "number" },
+      maximumAge: { type: "number" },
+      gender: { type: "string" },
     },
     required: [
       "userId",
@@ -53,6 +56,9 @@ export const surveySchemaAPI = {
       "inputRejection",
       "surveyDuration",
       "surveyAmount",
+      "minimumAge",
+      "maximumAge",
+      "gender",
     ],
 };
 

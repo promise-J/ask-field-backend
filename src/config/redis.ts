@@ -7,7 +7,7 @@ let redis: Redis | null = null;
 /**
  * Initialize Redis connection
  */
-export function connectRedis(): Redis | null {
+export async function connectRedis(): Promise<Redis | null> {
   if (!env.REDIS_URL) {
     logger.warn('⚠️ Redis disabled (REDIS_URL not set)');
     return null;

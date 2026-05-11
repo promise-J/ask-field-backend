@@ -244,6 +244,43 @@ export const surveyPaths = {
         },
       },
     },
+    "/surveys/check-eligibility/:surveyId": {
+      get: {
+        tags: ["Surveys"],
+        summary: "Check eligibility for a survey",
+        parameters: [
+          {
+            name: "surveyId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            description: "The ID of the survey to check eligibility for",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Eligibility checked successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    message: {type: "string", example: "Eligibility checked successfully"},
+                    data: {
+                      eligible: {type: "boolean", example: true},
+                      reason: {type: "string", example: "User is eligible for the survey"}
+                    }
+                  }
+                },
+              },
+            },
+          },
+          400: {
+            description: "Error checking eligibility",
+          },
+        },
+      },
+    },
     // "/surveys/update-draft-survey/:surveyId": {
     //   put: {
     //     tags: ["Surveys"],

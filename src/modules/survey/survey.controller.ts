@@ -74,3 +74,15 @@ export const getUserSurveyById = asyncHandler(
   }
 );
 
+export const checkEligibility = asyncHandler(
+  async (req: Request, res: Response) => {
+    const id = req.params.id;
+    const userId = req.user?.id || "";
+    const response = await surveyService.checkEligibility(req);
+    if(!response.success){
+      return apiFailureResponse(res, response.message);
+    }
+    return apiSuccessResponse(res, response.message, response.data, 201);
+  }
+);
+

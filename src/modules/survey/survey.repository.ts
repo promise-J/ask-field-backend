@@ -1,4 +1,5 @@
-import { SurveyModel } from "./survey.model";
+import { SurveyModel } from "./models/survey.model";
+
 
 
 export class SurveyRepository {
