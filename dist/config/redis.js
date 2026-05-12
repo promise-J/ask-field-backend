@@ -12,7 +12,7 @@ let redis = null;
 /**
  * Initialize Redis connection
  */
-function connectRedis() {
+async function connectRedis() {
     if (!_1.env.REDIS_URL) {
         _1.logger.warn('⚠️ Redis disabled (REDIS_URL not set)');
         return null;

@@ -18,10 +18,10 @@ class ResearcherService {
             let user = await researcherRepo.findByEmail(data.email);
             const participantExists = await participantRepo.findByEmail(data.email);
             if (user) {
-                return (0, apiResponse_1.serviceResponse)(false, "User exists alreay. Try another email");
+                return (0, apiResponse_1.serviceResponse)(false, "User exists already. Try another email");
             }
             if (participantExists) {
-                return (0, apiResponse_1.serviceResponse)(false, "User exists alreay. Try another email");
+                return (0, apiResponse_1.serviceResponse)(false, "User exists already. Try another email");
             }
             const verificationToken = crypto_1.default.randomBytes(32).toString("hex");
             const verificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);

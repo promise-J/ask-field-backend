@@ -18,6 +18,7 @@ const swagger_1 = require("./config/swagger/swagger");
 const app = (0, express_1.default)();
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)());
+// app.post("/webhook", express.raw({ type: "application/json" }), stripeWebhookHandler(require("stripe")(process.env.STRIPE_SECRET_KEY)));
 app.use(requestLogger_middleware_1.requestLogger);
 app.use(express_1.default.json());
 app.use((0, morgan_1.default)('dev'));

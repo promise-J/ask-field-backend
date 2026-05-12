@@ -15,5 +15,7 @@ const envSchema = zod_1.z.object({
     REFRESH_SECRET: zod_1.z.string(),
     ACCESS_SECRET: zod_1.z.string(),
     REDIS_URL: zod_1.z.string().optional(),
+    QUADTRICS_DATA_CENTER_ID: zod_1.z.string(),
+    QUADTRICS_API_KEY: zod_1.z.string(),
 });
 exports.env = envSchema.parse(process.env);
