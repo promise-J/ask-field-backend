@@ -1,5 +1,5 @@
 import { CreateProjectSchemaAPI, ProjectSchemaAPI } from "../../modules/project/project.schema";
-import { createDraftSurveySchemaAPI, surveySchemaAPI } from "../../modules/survey/survey.schema";
+import { createDraftSurveySchemaAPI, surveyActionSchemaAPI, surveySchemaAPI } from "../../modules/survey/survey.schema";
 import {
   CreateParticipantSchemaAPI,
   googleAuthSchemaAPI,
@@ -35,6 +35,7 @@ export const allSwaggerSchema = {
 
   //   Survey
   Survey: surveySchemaAPI,
+  SurveyAction: surveyActionSchemaAPI,
   CreateDraftSurvey: createDraftSurveySchemaAPI,
 
   //   Projects

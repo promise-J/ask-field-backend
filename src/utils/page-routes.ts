@@ -20,6 +20,13 @@ export const ROUTE_GET_SURVEYS_BY_PROJECT_ID = '/get-surveys-by-project/:id'
 export const ROUTE_GET_USER_SURVEY_ID = '/get-user-survey/:id'
 export const ROUTE_CHECK_ELIGIBILITY_SURVEY_ID = '/check-eligibility/:surveyId'
 
+export const ROUTE_CREATE_SURVEY_ACTION = '/create-survey-action'
+export const ROUTE_VERIRY_SURVEY_ACTION = '/verify-survey-action/:surveyActionId'
+export const ROUTE_APPROVE_SURVEY_ACTION = '/approve-survey-action/:surveyActionId'
+export const ROUTE_REJECT_SURVEY_ACTION = '/reject-survey-action/:surveyActionId'
+export const ROUTE_GET_SURVEY_ACTION_BY_ID = '/get-survey-action/:surveyActionId'
+export const ROUTE_LIST_SURVEY_ACTIONS = '/list-survey-actions'
+
 //project
 export const ROUTE_CREATE_PROJECT = '/create-project'
 export const ROUTE_LIST_USER_PROJECTS = '/list-user-projects'

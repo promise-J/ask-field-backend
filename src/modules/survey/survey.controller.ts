@@ -76,9 +76,62 @@ export const getUserSurveyById = asyncHandler(
 
 export const checkEligibility = asyncHandler(
   async (req: Request, res: Response) => {
-    const id = req.params.id;
-    const userId = req.user?.id || "";
     const response = await surveyService.checkEligibility(req);
+    if(!response.success){
+      return apiFailureResponse(res, response.message);
+    }
+    return apiSuccessResponse(res, response.message, response.data, 201);
+  }
+);
+export const createSurveyAction = asyncHandler(
+  async (req: Request, res: Response) => {
+    const response = await surveyService.createSurveyAction(req);
+    if(!response.success){
+      return apiFailureResponse(res, response.message);
+    }
+    return apiSuccessResponse(res, response.message, response.data, 201);
+  }
+);
+
+export const verifySurveyAction = asyncHandler(
+  async (req: Request, res: Response) => {
+    const response = await surveyService.verifySurveyAction(req);
+    if(!response.success){
+      return apiFailureResponse(res, response.message);
+    }
+    return apiSuccessResponse(res, response.message, response.data, 201);
+  }
+);
+export const approveSurveyAction = asyncHandler(
+  async (req: Request, res: Response) => {
+    const response = await surveyService.approveSurveyAction(req);
+    if(!response.success){
+      return apiFailureResponse(res, response.message);
+    }
+    return apiSuccessResponse(res, response.message, response.data, 201);
+  }
+);
+export const rejectSurveyAction = asyncHandler(
+  async (req: Request, res: Response) => {
+    const response = await surveyService.rejectSurveyAction(req);
+    if(!response.success){
+      return apiFailureResponse(res, response.message);
+    }
+    return apiSuccessResponse(res, response.message, response.data, 201);
+  }
+);
+export const listSurveyActions = asyncHandler(
+  async (req: Request, res: Response) => {
+    const response = await surveyService.listSurveyActions(req);
+    if(!response.success){
+      return apiFailureResponse(res, response.message);
+    }
+    return apiSuccessResponse(res, response.message, response.data, 201);
+  }
+);
+export const getSurveyActionById = asyncHandler(
+  async (req: Request, res: Response) => {
+    const response = await surveyService.getSurveyActionById(req);
     if(!response.success){
       return apiFailureResponse(res, response.message);
     }

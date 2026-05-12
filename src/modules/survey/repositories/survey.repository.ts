@@ -1,4 +1,4 @@
-import { SurveyModel } from "./models/survey.model";
+import { SurveyModel } from "../models/survey.model";
 
 
 

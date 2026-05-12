@@ -1,16 +1,42 @@
-import { Schema, model } from "mongoose";
+import { Schema, model, Document, Types } from "mongoose";
 
 export interface ISurveyAction extends Document {
-  userId: Schema.Types.ObjectId;
-  surveyId: Schema.Types.ObjectId;
-  status?: 'draft' | 'published' | 'closed';
+  surveyId: Types.ObjectId;
+  participantId: Types.ObjectId;
+  status: "approved" | "awaiting" | "in-progress" | "rejected";
+  startedAt: Date;
+  submittedAt?: Date;
+  timeSpent?: number; // in seconds
 }
 
 const surveyActionSchema = new Schema<ISurveyAction>(
   {
-    userId: { type: Schema.Types.ObjectId, required: false, trim: true, ref: 'Researcher' },
-    surveyId: { type: Schema.Types.ObjectId, required: false, trim: true, ref: 'Survey' },
-    status: { type: String, enum: ['draft', 'published', 'closed'], default: 'draft' },
+    surveyId: {
+      type: Schema.Types.ObjectId,
+      required: true,
+      ref: "Survey",
+    },
+    participantId: {
+      type: Schema.Types.ObjectId,
+      required: true,
+      ref: "User", // or "Researcher" depending on your system
+    },
+    status: {
+      type: String,
+      enum: ["approved", "awaiting", "in-progress", "rejected"],
+      default: "in-progress",
+    },
+    startedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    submittedAt: {
+      type: Date,
+    },
+    timeSpent: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );
