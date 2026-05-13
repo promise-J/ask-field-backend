@@ -40,8 +40,8 @@ router.get(ROUTE_CHECK_ELIGIBILITY_SURVEY_ID, participantAuth, checkEligibility)
 
 router.post(ROUTE_CREATE_SURVEY_ACTION, researcherAuth, createSurveyAction);
 router.get(ROUTE_VERIRY_SURVEY_ACTION, participantAuth, verifySurveyAction)
-router.put(ROUTE_APPROVE_SURVEY_ACTION, participantAuth, approveSurveyAction);
-router.put(ROUTE_REJECT_SURVEY_ACTION, participantAuth, rejectSurveyAction);
+router.put(ROUTE_APPROVE_SURVEY_ACTION, researcherAuth, approveSurveyAction);
+router.put(ROUTE_REJECT_SURVEY_ACTION, researcherAuth, rejectSurveyAction);
 router.get(ROUTE_GET_SURVEY_ACTION_BY_ID, authMiddleware, getSurveyActionById);
 router.get(ROUTE_GET_SURVEY_ACTION_BY_SURVEY_ID, authMiddleware, getSurveyActionBySurveyId);
 router.get(ROUTE_LIST_SURVEY_ACTIONS, researcherAuth, listSurveyActions)
