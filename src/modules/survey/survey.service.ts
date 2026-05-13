@@ -291,6 +291,12 @@ export class SurveyService {
         );
       }
 
+      await surveyActionRepo.create({
+        participantId: userId || "",
+        surveyId,
+        status: "in-progress"
+      });
+
       return serviceResponse(
         true,
         "User is eligible to take the survey."
@@ -366,9 +372,9 @@ export class SurveyService {
   async verifySurveyAction(req: Request){
     try {
       const userId = req.user?.id;
-      const surveyActionId = req.params.surveyActionId;
+      const surveyId = req.params.surveyActionId;
 
-      const surveyActionExists = await surveyActionRepo.findOne({participantId: userId || "", _id: surveyActionId});
+      const surveyActionExists = await surveyActionRepo.findOne({participantId: userId || "", surveyId});
 
       if(!surveyActionExists){
         return serviceResponse(
