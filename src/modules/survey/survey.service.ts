@@ -529,4 +529,29 @@ export class SurveyService {
       )
     }
   }
+  async getSurveyActionBySurveyId(req: Request){
+    try {
+      const surveyId = req.params.surveyId;
+      const surveyAction = await surveyActionRepo.findOne({surveyId});
+
+      if(!surveyAction){
+        return serviceResponse(
+          false,
+          "Survey action not found."
+        );
+      }
+
+      return serviceResponse(
+        true,
+        "Survey action fetched successfully.",
+        surveyAction
+      );
+    } catch (error) {
+      console.log(error)
+      return serviceResponse(
+        false,
+        "Something went wrong. Please try again later"
+      )
+    }
+  }
 }

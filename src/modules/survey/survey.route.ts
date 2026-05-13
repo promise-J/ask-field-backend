@@ -9,6 +9,7 @@ import {
   ROUTE_CREATE_SURVEY_ACTION,
   ROUTE_GET_ALL_SURVEYS,
   ROUTE_GET_SURVEY_ACTION_BY_ID,
+  ROUTE_GET_SURVEY_ACTION_BY_SURVEY_ID,
   ROUTE_GET_SURVEYS_BY_PROJECT_ID,
   ROUTE_GET_USER_SURVEY_ID,
   ROUTE_LIST_SURVEY_ACTIONS,
@@ -19,7 +20,7 @@ import {
 } from "../../utils/page-routes";
 
 import { createDraftSurveySchema, createSurveySchema } from "./survey.validation";
-import { approveSurveyAction, checkEligibility, createDraftSurvey, createSurvey, createSurveyAction, getAllSurveys, getSurveyActionById, getSurveysByProjectId, getUserSurveyById, listSurveyActions, publishSurvey, rejectSurveyAction, updateDraftSurvey, verifySurveyAction } from "./survey.controller";
+import { approveSurveyAction, checkEligibility, createDraftSurvey, createSurvey, createSurveyAction, getAllSurveys, getSurveyActionById, getSurveyActionBySurveyId, getSurveysByProjectId, getUserSurveyById, listSurveyActions, publishSurvey, rejectSurveyAction, updateDraftSurvey, verifySurveyAction } from "./survey.controller";
 import researcherAuth from "../../middlewares/auth/auth.researcher.middleware";
 import participantAuth from "../../middlewares/auth/auth.participant.middleware";
 import { authMiddleware } from "../../middlewares/auth/auth.middleware";
@@ -42,6 +43,7 @@ router.get(ROUTE_VERIRY_SURVEY_ACTION, participantAuth, verifySurveyAction)
 router.put(ROUTE_APPROVE_SURVEY_ACTION, participantAuth, approveSurveyAction);
 router.put(ROUTE_REJECT_SURVEY_ACTION, participantAuth, rejectSurveyAction);
 router.get(ROUTE_GET_SURVEY_ACTION_BY_ID, authMiddleware, getSurveyActionById);
+router.get(ROUTE_GET_SURVEY_ACTION_BY_SURVEY_ID, authMiddleware, getSurveyActionBySurveyId);
 router.get(ROUTE_LIST_SURVEY_ACTIONS, researcherAuth, listSurveyActions)
 
 

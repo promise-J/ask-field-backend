@@ -282,6 +282,45 @@ export const surveyPaths = {
       },
     },
   },
+  "/surveys/get-survey-action-by-survey/:surveyId": {
+    get: {
+      tags: ["Surveys"],
+      summary: "Fetch a survey by survey ID",
+      parameters: [
+        {
+          name: "surveyId",
+          in: "path",
+          required: true,
+          schema: { type: "string" },
+          description: "The ID of the survey to fetch",
+        },
+      ],
+      responses: {
+        201: {
+          description: "Survey fetched successfully",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  message: {
+                    type: "string",
+                    example: "Survey fetched successfully",
+                  },
+                  data: {
+                    $ref: "#/components/schemas/Survey",
+                  },
+                },
+              },
+            },
+          },
+        },
+        400: {
+          description: "Error fetching the survey",
+        },
+      },
+    },
+  },
   "/surveys/check-eligibility/:surveyId": {
     get: {
       tags: ["Surveys"],
