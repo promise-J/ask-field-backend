@@ -1,5 +1,5 @@
 import { Request } from "express";
-import * as UAParser from 'ua-parser-js';
+import { UAParser } from 'ua-parser-js';
 
 import { serviceResponse } from "../../utils/apiResponse";
 import { SurveyRepository } from "./repositories/survey.repository";
@@ -263,7 +263,7 @@ export class SurveyService {
         );
       }
 
-      const parser = new (UAParser as any)(req.headers['user-agent']);
+      const parser = new UAParser(req.headers['user-agent']);
       const device = parser.getDevice();
       // console.log(device.type);
 
