@@ -4,7 +4,7 @@ import { authMiddleware } from "./auth.middleware";
 function participantAuth(req: Request, res: Response, next: NextFunction){
     try {
         authMiddleware(req, res, ()=> {
-            if(req.user?.userType !== "researcher"){
+            if(req.user?.userType !== "participant"){
                 return res.status(403).json({ message: "Forbidden! Participant Only" });
             }
             next();
