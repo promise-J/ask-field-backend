@@ -583,7 +583,7 @@ export const surveyPaths = {
       },
     },
   },
-  "/surveys/reject-survey-actions/:surveyActionId": {
+  "/surveys/reject-survey-action/:surveyActionId": {
     put: {
       tags: ["Surveys"],
       summary: "Reject a survey action",
