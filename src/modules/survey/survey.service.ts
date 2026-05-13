@@ -410,7 +410,6 @@ export class SurveyService {
       const surveyId = req.params.surveyActionId;
 
       const filter = {participantId: userId || "", surveyId}
-      console.log(filter, "the filter")
 
       const surveyActionExists = await surveyActionRepo.findOne(filter);
 
