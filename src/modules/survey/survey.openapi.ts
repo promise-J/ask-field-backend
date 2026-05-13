@@ -493,7 +493,7 @@ export const surveyPaths = {
     },
   },
   "/surveys/verify-survey-action/:surveyActionId": {
-    patch: {
+    get: {
       tags: ["Surveys"],
       summary: "Submit a survey action for review",
       parameters: [
@@ -539,7 +539,7 @@ export const surveyPaths = {
     },
   },
   "/surveys/approve-survey-action/:surveyActionId": {
-    patch: {
+    put: {
       tags: ["Surveys"],
       summary: "Approve a survey action",
       parameters: [
@@ -584,7 +584,7 @@ export const surveyPaths = {
     },
   },
   "/surveys/reject-survey-actions/:surveyActionId": {
-    patch: {
+    put: {
       tags: ["Surveys"],
       summary: "Reject a survey action",
       parameters: [
