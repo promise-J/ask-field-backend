@@ -263,6 +263,8 @@ export class SurveyService {
         );
       }
 
+     
+
       const parser = new UAParser(req.headers['user-agent']);
       const device = parser.getDevice();
       // console.log(device.type);
@@ -291,16 +293,48 @@ export class SurveyService {
         );
       }
 
-      const surveyAction = await surveyActionRepo.create({
-        participantId: userId || "",
-        surveyId,
-        status: "in-progress"
-      });
+      const surveyActionExists = await surveyActionRepo.findOne({participantId: userId || "", surveyId});
+
+      if(surveyActionExists && surveyActionExists.status === "approved"){
+        return serviceResponse(
+          true,
+          "You have already completed this survey.",
+          surveyActionExists
+        );
+      }
+
+      if(surveyActionExists && surveyActionExists.status === "rejected"){
+        return serviceResponse(
+          true,
+          "You have already completed this survey.",
+          surveyActionExists
+        );
+
+      }
+
+      if(surveyActionExists && surveyActionExists.status === "awaiting"){
+        return serviceResponse(
+          true,
+          "You have already submitted this survey.",
+          surveyActionExists
+        );
+      }
+
+      let surveyAction = null;
+      if(!surveyActionExists){
+        surveyAction = await surveyActionRepo.create({
+          participantId: userId || "",
+          surveyId,
+          status: "in-progress"
+        });
+      }
+
+      const surveyActionResult = surveyActionExists ? surveyActionExists : surveyAction;
 
       return serviceResponse(
         true,
         "User is eligible to take the survey.",
-        surveyAction
+        surveyActionResult
       );
     } catch (error) {
       console.log(error);
