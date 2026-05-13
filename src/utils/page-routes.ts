@@ -27,7 +27,7 @@ export const ROUTE_APPROVE_SURVEY_ACTION = '/approve-survey-action/:surveyAction
 export const ROUTE_REJECT_SURVEY_ACTION = '/reject-survey-action/:surveyActionId'
 export const ROUTE_GET_SURVEY_ACTION_BY_ID = '/get-survey-action/:surveyActionId'
 export const ROUTE_LIST_SURVEY_ACTIONS = '/list-survey-actions'
-export const ROUTE_GET_SURVEY_ACTION_BY_SURVEY_ID = '/get-survey-action-by-survey/:surveyId'
+export const ROUTE_GET_SURVEY_ACTION_BY_SURVEY_ID = '/get-survey-action-by-surveyid/:surveyId'
 
 //project
 export const ROUTE_CREATE_PROJECT = '/create-project'

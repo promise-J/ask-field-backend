@@ -282,7 +282,7 @@ export const surveyPaths = {
       },
     },
   },
-  "/surveys/get-survey-action-by-survey/:surveyId": {
+  "/surveys/get-survey-action-by-surveyid/:surveyId": {
     get: {
       tags: ["Surveys"],
       summary: "Fetch a survey by survey ID",
