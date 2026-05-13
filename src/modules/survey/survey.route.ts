@@ -33,7 +33,7 @@ router.post(ROUTE_PUBLISH_DRAFT_SURVEY, researcherAuth, publishSurvey);
 router.post(ROUTE_CREATE_SURVEY, validate(createSurveySchema), researcherAuth, createSurvey);
 router.get(ROUTE_GET_SURVEYS_BY_PROJECT_ID, researcherAuth, getSurveysByProjectId);
 router.get(ROUTE_GET_ALL_SURVEYS, authMiddleware, getAllSurveys);
-router.get(ROUTE_GET_USER_SURVEY_ID, researcherAuth, getUserSurveyById);
+router.get(ROUTE_GET_USER_SURVEY_ID, authMiddleware, getUserSurveyById);
 router.get(ROUTE_CHECK_ELIGIBILITY_SURVEY_ID, participantAuth, checkEligibility);
 
 
