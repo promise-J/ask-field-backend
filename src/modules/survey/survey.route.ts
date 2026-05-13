@@ -34,7 +34,7 @@ router.post(ROUTE_CREATE_SURVEY, validate(createSurveySchema), researcherAuth, c
 router.get(ROUTE_GET_SURVEYS_BY_PROJECT_ID, researcherAuth, getSurveysByProjectId);
 router.get(ROUTE_GET_ALL_SURVEYS, authMiddleware, getAllSurveys);
 router.get(ROUTE_GET_USER_SURVEY_ID, researcherAuth, getUserSurveyById);
-router.post(ROUTE_CHECK_ELIGIBILITY_SURVEY_ID, participantAuth, checkEligibility);
+router.get(ROUTE_CHECK_ELIGIBILITY_SURVEY_ID, participantAuth, checkEligibility);
 
 
 router.post(ROUTE_CREATE_SURVEY_ACTION, researcherAuth, createSurveyAction);
