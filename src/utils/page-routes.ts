@@ -17,6 +17,7 @@ export const ROUTE_CREATE_DRAFT_SURVEY = '/create-draft-survey'
 export const ROUTE_UPDATE_DRAFT_SURVEY = '/update-draft-survey/:id'
 export const ROUTE_PUBLISH_DRAFT_SURVEY = '/publish-draft-survey/:id'
 export const ROUTE_GET_SURVEYS_BY_PROJECT_ID = '/get-surveys-by-project/:id'
+export const ROUTE_GET_ALL_SURVEYS = '/get-all-surveys'
 export const ROUTE_GET_USER_SURVEY_ID = '/get-user-survey/:id'
 export const ROUTE_CHECK_ELIGIBILITY_SURVEY_ID = '/check-eligibility/:surveyId'
 

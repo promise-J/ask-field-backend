@@ -61,6 +61,18 @@ export const getSurveysByProjectId = asyncHandler(
     return apiSuccessResponse(res, response.message, response.data, 201);
   }
 );
+export const getAllSurveys = asyncHandler(
+  async (req: Request, res: Response) => {
+    const id = req.params.id;
+    const userId = req.user?.id || "";
+    const status = req.query.status as string | undefined;
+    const response = await surveyService.getAllSurveys(status);
+    if(!response.success){
+      return apiFailureResponse(res, response.message);
+    }
+    return apiSuccessResponse(res, response.message, response.data, 201);
+  }
+);
 
 export const getUserSurveyById = asyncHandler(
   async (req: Request, res: Response) => {

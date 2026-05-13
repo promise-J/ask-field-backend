@@ -203,6 +203,46 @@ export const surveyPaths = {
       },
     },
   },
+  "/surveys/get-all-surveys": {
+    get: {
+      tags: ["Surveys"],
+      summary: "Fetch all surveys of a project",
+      parameters: [
+        {
+          name: "status",
+          in: "query",
+          required: true,
+          schema: { type: "string", example: "published | draft | closed" },
+          description: "The status of the project to fetch surveys for",
+        },
+      ],
+      responses: {
+        201: {
+          description: "Surveys fetched successfully",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  message: {
+                    type: "string",
+                    example: "Surveys fetched successfully",
+                  },
+                  data: {
+                    type: "array",
+                    items: { $ref: "#/components/schemas/Survey" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        400: {
+          description: "Error fetching the surveys",
+        },
+      },
+    },
+  },
   "/surveys/get-user-survey/:surveyId": {
     get: {
       tags: ["Surveys"],

@@ -164,6 +164,24 @@ export class SurveyService {
       );
     }
   }
+  async getAllSurveys( status: string = "published") {
+    try {
+      const filter = {status, surveyLabel: "survey"}
+      const surveys = await surveyRepo.find(filter);
+
+      return serviceResponse(
+        true,
+        "Surveys fetched successfully.",
+        surveys
+      );
+    } catch (error) {
+      console.log(error, "the get surveys by project id");
+      return serviceResponse(
+        false,
+        "Something went wrong. Please try again later"
+      );
+    }
+  }
   async getSurveysByProjectId(userId: string, projectId: string, status: string = "published") {
     try {
       const filter = {userId, projectId, status, surveyLabel: "survey"}
