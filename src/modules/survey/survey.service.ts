@@ -291,7 +291,7 @@ export class SurveyService {
         );
       }
 
-      await surveyActionRepo.create({
+      const surveyAction = await surveyActionRepo.create({
         participantId: userId || "",
         surveyId,
         status: "in-progress"
@@ -299,7 +299,8 @@ export class SurveyService {
 
       return serviceResponse(
         true,
-        "User is eligible to take the survey."
+        "User is eligible to take the survey.",
+        surveyAction
       );
     } catch (error) {
       console.log(error);
