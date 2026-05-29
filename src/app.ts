@@ -13,15 +13,17 @@ import AppError from './error-helpers/appError';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerDocument } from './config/swagger/swagger';
 import { stripeWebhookHandler } from './config/payment/stripeWebhook';
+import  Stripe from 'stripe';
 
 
 const app = express();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 app.use(helmet());
 app.use(cors());
 
 // app.post("/webhook", express.raw({ type: "application/json" }), stripeWebhookHandler(require("stripe")(process.env.STRIPE_SECRET_KEY)));
-app.post("/stripe-webhook", express.raw({ type: "application/json" }), stripeWebhookHandler);
+app.post("/stripe-webhook", express.raw({ type: "application/json" }), stripeWebhookHandler(stripe));
 
 
 app.use(requestLogger);
