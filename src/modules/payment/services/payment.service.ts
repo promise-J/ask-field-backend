@@ -35,12 +35,14 @@ export class PaymentService {
     // const { amountInEuro, recipientAccount, recipientBank, recipientName } =
     //   req.body;
     const amountInEuro = req.body.amount || 1000
+    const userEmail = req.body.email || 'chiemelapromise30@gmail.com'
 
     try {
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card", "sepa_debit"], // European local favorites
         mode: "payment",
         currency: "eur",
+        customer_email: userEmail,
         line_items: [
           {
             price_data: {
@@ -57,11 +59,12 @@ export class PaymentService {
         metadata: {
           amount: amountInEuro
         },
-        success_url: "http://localhost:3000/success.html",
-        cancel_url: "http://localhost:3000/cancel.html",
+        success_url: "https://www.joinstudy.io",
+        cancel_url: "https://www.joinstudy.io/cancel",
       });
 
       // Send the checkout URL back to your frontend
+      console.log(session.url)
       return serviceResponse(true, 'Payment intent successful', {url: session.url})
     } catch (error: any) {
       return serviceResponse(false, 'Failed payment intent', error.message)

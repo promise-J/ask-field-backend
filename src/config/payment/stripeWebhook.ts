@@ -9,12 +9,14 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 export const stripeWebhookHandler = (stripe: Stripe): RequestHandler => {
   return async (req: Request, res: Response): Promise<void> => {
     const sig = req.headers["stripe-signature"];
+    console.log({sig})
 
     if (!sig || !endpointSecret) {
       console.error("❌ Missing stripe-signature or STRIPE_WEBHOOK_SECRET configuration.");
       res.sendStatus(400);
       return;
     }
+    console.log({body: req.body})
 
     let event: any;
 
@@ -25,12 +27,14 @@ export const stripeWebhookHandler = (stripe: Stripe): RequestHandler => {
         sig,
         endpointSecret
       );
+      console.log({event}, 'inside event')
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       console.error(`❌ Webhook Signature Verification Failed:`, errorMessage);
       res.sendStatus(400);
       return;
     }
+    console.log({event},'outside event')
 
     // Handle events with strict TypeScript discrimination
     switch (event.type) {
