@@ -78,3 +78,8 @@ export const loginResearcherSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
+
+export const acceptPaymentSchema = z.object({
+  email: z.string().email(),
+  pasamountsword: z.number().min(3, 'Amount must be at least 3'),
+});

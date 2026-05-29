@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { validate } from "../../../middlewares/validate";
 import {
+  acceptPaymentSchema,
   createParticipantSchema,
   createResearcherSchema,
   loginParticipantSchema,
@@ -26,7 +27,7 @@ router.post(ROUTE_AUTH_LOGIN, validate(loginResearcherSchema), loginUser);
 router.get(ROUTE_AUTH_VERIFY_EMAIL, verifyEmail);
 router.get(ROUTE_ME, authMiddleware, getUser);
 router.get(ROUTE_DASHBOARD_STATS, researcherAuth, researcherDashboardStats);
-router.post(ROUTE_ACCEPT_PAYMENT, acceptPayment);
+router.post(ROUTE_ACCEPT_PAYMENT, validate(acceptPaymentSchema), researcherAuth, acceptPayment);
 
 
 export default router;

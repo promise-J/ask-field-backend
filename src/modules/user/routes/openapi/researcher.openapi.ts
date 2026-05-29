@@ -157,4 +157,65 @@ export const researcherPaths = {
       },
     },
   },
+  "/researchers/accept-payment": {
+  post: {
+    tags: ["Researchers"],
+    summary: "Initialize a Stripe checkout session for remittance",
+    description: "Creates a Stripe Checkout Session and returns a payment URL for the foreign client.",
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            required: ["amount", "email"],
+            properties: {
+              amount: {
+                type: "number",
+                description: "The payment amount in Euros (EUR)",
+                example: 5000.00
+              },
+              email: {
+                type: "string",
+                format: "email",
+                description: "The email address of the payer to pre-fill on Stripe Checkout",
+                example: "client@example.com"
+              }
+            }
+          }
+        }
+      }
+    },
+    responses: {
+      201: {
+        description: "Checkout session initialized successfully",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                message: {
+                  type: "string",
+                  example: "Payment session initialized successfully"
+                },
+                url: {
+                  type: "string",
+                  format: "uri",
+                  description: "The hosted Stripe Checkout URL to redirect your client to",
+                  example: "https://stripe.com_..."
+                }
+              }
+            }
+          }
+        }
+      },
+      400: {
+        description: "Invalid input or missing required payment fields"
+      },
+      500: {
+        description: "Failed to communicate with Stripe gateway"
+      }
+    }
+  }
+}
 };
