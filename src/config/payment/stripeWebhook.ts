@@ -9,7 +9,7 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 export const stripeWebhookHandler = (stripe: Stripe): RequestHandler => {
   return async (req: Request, res: Response): Promise<void> => {
     const sig = req.headers["stripe-signature"];
-    console.log({sig})
+    console.log({sig, endpointSecret})
 
     if (!sig || !endpointSecret) {
       console.error("❌ Missing stripe-signature or STRIPE_WEBHOOK_SECRET configuration.");
