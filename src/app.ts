@@ -21,6 +21,7 @@ app.use(helmet());
 app.use(cors());
 
 // app.post("/webhook", express.raw({ type: "application/json" }), stripeWebhookHandler(require("stripe")(process.env.STRIPE_SECRET_KEY)));
+app.post("/stripe-webhook", express.raw({ type: "application/json" }), stripeWebhookHandler);
 
 
 app.use(requestLogger);

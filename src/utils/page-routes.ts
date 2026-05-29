@@ -10,6 +10,7 @@ export const ROUTE_RESET_PASSWORD = '/auth/reset-password'
 export const ROUTE_ME = '/me'
 export const ROUTE_COMPLETE_PROFILE = '/auth/complete-profile'
 export const ROUTE_DASHBOARD_STATS = '/dashboard-stats'
+export const ROUTE_ACCEPT_PAYMENT = '/accept-payment'
 
 //survey
 export const ROUTE_CREATE_SURVEY = '/create-survey'

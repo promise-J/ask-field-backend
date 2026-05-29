@@ -9,13 +9,14 @@ import {
 } from "../user.validation";
 import { authMiddleware } from "../../../middlewares/auth/auth.middleware";
 import {
+  ROUTE_ACCEPT_PAYMENT,
   ROUTE_AUTH_LOGIN,
   ROUTE_AUTH_REGISTER,
   ROUTE_AUTH_VERIFY_EMAIL,
   ROUTE_DASHBOARD_STATS,
   ROUTE_ME,
 } from "../../../utils/page-routes";
-import { createUser, getUser, loginUser, researcherDashboardStats, verifyEmail } from "../controllers/researcher.controller";
+import { acceptPayment, createUser, getUser, loginUser, researcherDashboardStats, verifyEmail } from "../controllers/researcher.controller";
 import researcherAuth from "../../../middlewares/auth/auth.researcher.middleware";
 
 const router = Router();
@@ -25,6 +26,7 @@ router.post(ROUTE_AUTH_LOGIN, validate(loginResearcherSchema), loginUser);
 router.get(ROUTE_AUTH_VERIFY_EMAIL, verifyEmail);
 router.get(ROUTE_ME, authMiddleware, getUser);
 router.get(ROUTE_DASHBOARD_STATS, researcherAuth, researcherDashboardStats);
+router.post(ROUTE_ACCEPT_PAYMENT, acceptPayment);
 
 
 export default router;

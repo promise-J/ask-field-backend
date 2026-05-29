@@ -5,8 +5,10 @@ import {
   apiFailureResponse,
   apiSuccessResponse,
 } from "../../../utils/apiResponse";
+import { PaymentService } from "../../payment/services/payment.service";
 
 const researcherService = new ResearcherService();
+const paymentService = new PaymentService();
 
 export const createUser = asyncHandler(async (req: Request, res: Response) => {
   const response = await researcherService.createUser(req.body);
@@ -41,6 +43,14 @@ export const getUser = asyncHandler(async (req: Request, res: Response) => {
 
 export const researcherDashboardStats = asyncHandler(async (req: Request, res: Response) => {
   const response = await researcherService.researcherDashboardStats(req);
+  if (!response.success) {
+    return apiFailureResponse(res, response.message);
+  }
+  return apiSuccessResponse(res, response.message, response.data, 201);
+});
+
+export const acceptPayment = asyncHandler(async (req: Request, res: Response) => {
+  const response = await paymentService.acceptPayment(req);
   if (!response.success) {
     return apiFailureResponse(res, response.message);
   }
