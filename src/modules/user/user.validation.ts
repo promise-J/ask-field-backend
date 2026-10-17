@@ -1,85 +1,152 @@
 import { z } from 'zod';
 
+const email = z.string().trim().email('Enter a valid email address.');
+const name = (label: string) => z.string().trim().min(1, `${label} is required.`).max(80);
 
-//Participants
-export const createParticipantSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  firstName: z.string().nonempty('First name is required'),
-  lastName: z.string().min(5),
-  signupPlatform: z.enum(['email', 'google']).default('email'),
-  receivesUpdates: z.boolean().default(false),
+export const registerParticipantSchema = z.object({
+  email,
+  password: z.string().min(6, 'Password must be at least 6 characters.'),
+  firstName: name('First name'),
+  lastName: name('Last name'),
+  receivesUpdates: z.boolean().optional(),
 });
 
-export const loginParticipantSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+const METHODS = ['survey', 'interview', 'focus-group', 'product-test'] as const;
+
+/**
+ * Stage 1 sign-up is one screen: full name, work email, password. Older clients may still send
+ * firstName/lastName and the organisation fields, so both shapes are accepted.
+ */
+export const registerResearcherSchema = z
+  .object({
+    email,
+    password: z.string().min(8, 'Password must be at least 8 characters.'),
+    fullName: z.string().trim().max(160).optional(),
+    firstName: z.string().trim().max(80).optional(),
+    lastName: z.string().trim().max(80).optional(),
+    receivesUpdates: z.boolean().optional().default(false),
+    method: z.enum(METHODS).optional(),
+    source: z.string().trim().max(40).optional(),
+    jobTitle: z.string().trim().max(120).optional(),
+    organizationName: z.string().trim().max(160).optional(),
+    organizationType: z.string().trim().max(80).optional(),
+    country: z.string().trim().max(80).optional(),
+  })
+  .transform((v, ctx) => {
+    let first = v.firstName ?? '';
+    let last = v.lastName ?? '';
+    if (v.fullName) {
+      const parts = v.fullName.split(/\s+/).filter(Boolean);
+      first = parts[0] ?? '';
+      last = parts.slice(1).join(' ');
+    }
+    if (!first) ctx.addIssue({ code: 'custom', message: 'Enter your name.', path: ['fullName'] });
+    const { fullName: _f, method, source, ...rest } = v;
+    return {
+      ...rest,
+      firstName: first,
+      lastName: last,
+      signupIntent: method || source ? { method, source } : undefined,
+    };
+  });
+
+export const loginSchema = z.object({
+  email,
+  password: z.string().min(1, 'Enter your password.'),
 });
 
+const accountType = z.enum(['researcher', 'participant']);
 
-export const verifyEmailQuerySchema = z.object({
-  email: z.string().email(),
-  token: z.string().min(20, "Invalid token"), // adjust min length based on your token generation
+/** One sign-in for both account types (Stage 1). */
+export const unifiedLoginSchema = loginSchema.extend({
+  accountType: accountType.optional(),
+  intent: accountType.optional(),
 });
 
-export const googleAuthSchema = z.object({
-  token: z.string().min(10, "Invalid token"),
-})
+export const unifiedGoogleSchema = z.object({
+  token: z.string().min(10, 'Missing Google token.'),
+  accountType: accountType.optional(),
+  intent: accountType.optional(),
+  method: z.enum(METHODS).optional(),
+});
 
-export const sendOtpSchema = z.object({
-  email: z.string().email(),
-})
+export const resendVerificationSchema = z.object({ email, accountType: accountType.optional() });
+
+export const googleAuthSchema = z.object({ token: z.string().min(10, 'Missing Google token.') });
+
+export const sendOtpSchema = z.object({ email });
+
 export const verifyOtpSchema = z.object({
-  email: z.string().email(),
-  code: z.string().min(6, "Invalid token"),
-})
+  email,
+  code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code.'),
+});
+
 export const resetPasswordSchema = z.object({
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  email: z.string().email(),
-  token: z.string().min(10, "Invalid token"), // adjust min length based on your token generation
-})
-
-export const completeProfileSchema = z.object({
-  gender: z.string().min(1, "Gender is required"),
-  ethnic: z.string().min(1, "Ethnicity is required"),
-  educationLevel: z.string().min(1, "Education level is required"),
-  isStudent: z.string().min(1, "Student status is required"),
-  dob_day: z.string().min(1, "Day is required"),
-  dob_month: z.string().min(1, "Month is required"),
-  dob_year: z.string().min(1, "Year is required"),
-  firstLanguage: z.string().min(1, "First language is required"),
-  fluentLanguage: z.string().min(1, "Fluent language is required"),
-  dialect: z.string().min(1, "Dialect is required"),
-  countryOfBirth: z.string().min(1, "Country of birth is required"),
-  countryOfResidence: z.string().min(1, "Country of residence is required"),
-  pob: z.string().min(1, "Place of birth is required"),
-  mostLifeTime: z.string().min(1, "This field is required"),
-  mostTimeSpent: z.string().min(1, "This field is required"),
-  currency: z.string().min(1, "Currency is required"),
-  payPerHour: z.string().min(1, "Pay per hour is required"),
-  workHour: z.string().min(1, "Work hours are required"),
-  shareLinkedin: z.string().min(1, "LinkedIn preference is required"),
+  email,
+  token: z.string().min(10, 'This reset link is not valid.'),
+  password: z.string().min(8, 'Password must be at least 8 characters.'),
+  intent: z.enum(['researcher', 'participant']).optional(),
 });
 
-//Researcher
-export const createResearcherSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  firstName: z.string().nonempty('First name is required'),
-  lastName: z.string().min(5),
-  signupPlatform: z.enum(['email', 'google']).default('email'),
-  jobTitle: z.string().min(3),
-  organizationType: z.string().min(3),
-  organizationName: z.string().min(3),
-  country: z.string().min(3),
+/** Profile answers are free-form strings keyed by question name (see PARTICIPANT_QUESTIONS in the frontend). */
+export const completeProfileSchema = z
+  .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+  .refine((v) => Object.keys(v).length > 0, 'Answer the profile questions to continue.');
+
+const tags = z.array(z.string().trim().min(1).max(80)).max(20);
+export const completeResearcherProfileSchema = z.object({
+  purposeHere: tags.default([]),
+  researchType: tags.default([]),
+  researchInterest: tags.default([]),
+  firstName: z.string().trim().min(1, 'First name is required.').max(80),
+  lastName: z.string().trim().min(1, 'Last name is required.').max(80),
+  organization: z.string().trim().min(1, 'Organisation is required.').max(160),
+  street: z.string().trim().min(1, 'Street is required.').max(200),
+  address2: z.string().trim().max(200).optional(),
+  city: z.string().trim().min(1, 'City is required.').max(120),
+  country: z.string().trim().min(1, 'Country is required.').max(80),
 });
 
-export const loginResearcherSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+export const payoutSchema = z.object({
+  method: z.enum(['bank_transfer', 'mobile_money', 'paypal']).default('bank_transfer'),
+  bankName: z.string().trim().max(120).optional(),
+  accountName: z.string().trim().min(2, 'Enter the account name.').max(120),
+  accountNumber: z.string().trim().min(4, 'Enter the account number.').max(64),
 });
 
-export const acceptPaymentSchema = z.object({
-  email: z.string().email(),
-  pasamountsword: z.number().min(3, 'Amount must be at least 3'),
+// Kept for backwards compatibility with the original starter.
+export const createParticipantSchema = registerParticipantSchema;
+
+/* ---------- Stage 2: account setup ---------- */
+export const ORG_TYPES = ['university', 'institute', 'company', 'nonprofit', 'government', 'independent'] as const;
+/** Organisation types that can verify and get the academic fee. */
+export const VERIFIABLE_ORG_TYPES: readonly string[] = ['university', 'institute', 'nonprofit', 'government'];
+export const FIRST_METHODS = ['survey', 'interview', 'focus-group', 'product-test', 'ai-evaluation', 'not-sure'] as const;
+
+export const profileSchema = z
+  .object({
+    organizationType: z.enum(ORG_TYPES, { message: 'Choose where you work.' }),
+    organizationName: z.string().trim().max(160).optional().default(''),
+    country: z.string().trim().min(2, "Choose the country you're based in.").max(80),
+    role: z.string().trim().max(80).optional(),
+    researchAreas: z.array(z.string().trim().min(1).max(60)).max(15).optional().default([]),
+    firstMethod: z.enum(FIRST_METHODS).optional(),
+    heardFrom: z.string().trim().max(80).optional(),
+  })
+  .refine((v) => v.organizationType === 'independent' || v.organizationName.length > 0, {
+    message: "Enter your organisation's name.",
+    path: ['organizationName'],
+  });
+
+export const workEmailSchema = z.object({ email });
+export const workEmailCodeSchema = z.object({ code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code.') });
+export const staffLinkSchema = z.object({
+  url: z
+    .string()
+    .trim()
+    .url('Enter the full link, starting with https://')
+    .refine((u) => /^https?:\/\//i.test(u), 'Enter the full link, starting with https://'),
 });
+
+/** Stage 3: the founding-lab card on the researcher home. */
+export const foundingLabSchema = z.object({ action: z.enum(['apply', 'dismiss']) });

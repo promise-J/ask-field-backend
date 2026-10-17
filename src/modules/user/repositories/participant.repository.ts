@@ -1,19 +1,20 @@
 import { ParticipantModel } from '../models/participant.model';
 
+const SECRETS = '+password +verificationToken +verificationTokenExpires +otp +otpExpires +otpAttempts +resetToken +resetTokenExpires';
+
 export class ParticipantRepository {
-  async create(data: any) {
-    return await ParticipantModel.create(data);
+  model = ParticipantModel;
+
+  create(data: any) {
+    return ParticipantModel.create(data);
   }
 
-  async findByEmail(email: string) {
-    return await ParticipantModel.findOne({ email });
+  findByEmail(email: string, withSecrets = false) {
+    const q = ParticipantModel.findOne({ email: email.toLowerCase().trim() });
+    return withSecrets ? q.select(SECRETS) : q;
   }
 
-  async findById(id: string) {
-    return await ParticipantModel.findById(id);
-  }
-
-  async findOne(query: any) {
-    return await ParticipantModel.findOne(query);
+  findById(id: string) {
+    return ParticipantModel.findById(id);
   }
 }

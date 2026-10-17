@@ -1,14 +1,29 @@
-import jwt, { JwtPayload } from 'jsonwebtoken'
-import { env } from '../config';
+import jwt, { SignOptions } from 'jsonwebtoken';
+import { env, config } from '../config/env';
 
-const REFRESH_SECRET = env.REFRESH_SECRET
-const ACCESS_SECRET = env.ACCESS_SECRET
+export type UserType = 'participant' | 'researcher';
 
-export const verifyRefreshToken = (token: string)=>{
-    return jwt.verify(token, REFRESH_SECRET);
+export interface TokenPayload {
+  id: string;
+  userType: UserType;
 }
 
-export const signAccessToken = (payload: JwtPayload)=>{
-    return jwt.sign(payload, ACCESS_SECRET, { expiresIn: "1h" });
+export function signAccessToken(payload: TokenPayload) {
+  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.ACCESS_TOKEN_TTL } as SignOptions);
+}
 
+export function signRefreshToken(payload: TokenPayload) {
+  return jwt.sign(payload, config.refreshSecret, { expiresIn: env.REFRESH_TOKEN_TTL } as SignOptions);
+}
+
+export function verifyAccessToken(token: string) {
+  return jwt.verify(token, env.JWT_SECRET) as TokenPayload;
+}
+
+export function verifyRefreshToken(token: string) {
+  return jwt.verify(token, config.refreshSecret) as TokenPayload;
+}
+
+export function issueTokens(payload: TokenPayload) {
+  return { accessToken: signAccessToken(payload), refreshToken: signRefreshToken(payload) };
 }

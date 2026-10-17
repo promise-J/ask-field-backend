@@ -1,8 +1,7 @@
 import pino from 'pino';
-import { env } from './env';
 
 const logger = pino({
-  level: env.NODE_ENV === 'production' ? 'info' : 'debug',
+  level: process.env.NODE_ENV === 'test' ? 'silent' : process.env.NODE_ENV === 'production' ? 'info' : 'debug',
 });
 
 export default logger;

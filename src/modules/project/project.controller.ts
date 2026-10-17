@@ -1,70 +1,33 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler';
-import { apiFailureResponse, apiSuccessResponse } from '../../utils/apiResponse';
+import { apiSuccessResponse } from '../../utils/apiResponse';
 import { ProjectService } from './project.service';
-import { id } from 'zod/v4/locales';
 
-const projectService = new ProjectService();
+const service = new ProjectService();
 
-export const createProject = asyncHandler(
-  async (req: Request, res: Response) => {
-    const userId = req.user?.id || "";
-    const response = await projectService.createProject(userId, req.body);
-    if(!response.success){
-      return apiFailureResponse(res, response.message);
-    }
-    return apiSuccessResponse(res, response.message, response.data, 201);
-  }
-);
-export const listUserProjects = asyncHandler(
-  async (req: Request, res: Response) => {
-    const userId = req.user?.id || "";
-    const response = await projectService.listUserProjects(userId, req.query);
-    if(!response.success){
-      return apiFailureResponse(res, response.message);
-    }
-    return apiSuccessResponse(res, response.message, response.data, 201);
-  }
-);
-export const getProjectById = asyncHandler(
-  async (req: Request, res: Response) => {
-    const {id} = req.params;
-    const response = await projectService.getProjectById(id);
-    if(!response.success){
-      return apiFailureResponse(res, response.message);
-    }
-    return apiSuccessResponse(res, response.message, response.data, 201);
-  }
-);
-export const renameProject = asyncHandler(
-  async (req: Request, res: Response) => {
-    const id = req.params.id
-    const newTitle = req.body.title;
-    const response = await projectService.renameProject(id, newTitle);
-    if(!response.success){
-      return apiFailureResponse(res, response.message);
-    }
-    return apiSuccessResponse(res, response.message, response.data, 201);
-  }
-);
-export const pinProject = asyncHandler(
-  async (req: Request, res: Response) => {
-    const id = req.params.id
-    const response = await projectService.pinProject(id);
-    if(!response.success){
-      return apiFailureResponse(res, response.message);
-    }
-    return apiSuccessResponse(res, response.message, response.data, 201);
-  }
-);
-export const deleteProject = asyncHandler(
-  async (req: Request, res: Response) => {
-    const id = req.params.id
-    const response = await projectService.deleteProject(id);
-    if(!response.success){
-      return apiFailureResponse(res, response.message);
-    }
-    return apiSuccessResponse(res, response.message, response.data, 201);
-  }
-);
+export const listProjects = asyncHandler(async (req: Request, res: Response) => {
+  const data = await service.list(req.user!.id, Number(req.query.page), Number(req.query.limit));
+  apiSuccessResponse(res, 'Projects fetched.', data);
+});
 
+export const createProject = asyncHandler(async (req: Request, res: Response) => {
+  apiSuccessResponse(res, 'Project created.', await service.create(req.user!.id, req.body), 201);
+});
+
+export const getProject = asyncHandler(async (req: Request, res: Response) => {
+  apiSuccessResponse(res, 'Project fetched.', await service.getOwned(req.user!.id, req.params.id));
+});
+
+export const renameProject = asyncHandler(async (req: Request, res: Response) => {
+  apiSuccessResponse(res, 'Project renamed.', await service.rename(req.user!.id, req.params.id, req.body.title));
+});
+
+export const pinProject = asyncHandler(async (req: Request, res: Response) => {
+  const project = await service.togglePin(req.user!.id, req.params.id);
+  apiSuccessResponse(res, project.pinned ? 'Project pinned.' : 'Project unpinned.', project);
+});
+
+export const deleteProject = asyncHandler(async (req: Request, res: Response) => {
+  await service.remove(req.user!.id, req.params.id);
+  apiSuccessResponse(res, 'Project deleted.', null);
+});

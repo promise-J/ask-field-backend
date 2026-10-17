@@ -1,12 +1,10 @@
 import { z } from 'zod';
 
-
-//Project
 export const createProjectSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters'),
-  participantView: z.string().min(1, ''),
+  title: z.string().trim().min(1, 'Give your project a name.').max(120, 'Keep the project name under 120 characters.'),
+  participantView: z.string().trim().max(120).optional().default(''),
 });
 
 export const renameProjectSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters'),
+  title: z.string().trim().min(1, 'Give your project a name.').max(120, 'Keep the project name under 120 characters.'),
 });

@@ -1,107 +1,59 @@
 import { Request, Response } from 'express';
-import { ParticipantService } from '../services/participant.service';
+import { ParticipantModel } from '../models/participant.model';
+import { AuthService } from '../services/auth.service';
+import { makeAuthController } from './auth.controller';
 import { asyncHandler } from '../../../utils/asyncHandler';
-import { apiFailureResponse, apiSuccessResponse } from '../../../utils/apiResponse';
+import { apiSuccessResponse } from '../../../utils/apiResponse';
+import AppError from '../../../error-helpers/appError';
 
-const participantService = new ParticipantService();
+export const participantAuth = new AuthService(ParticipantModel, 'participant');
+export const participantController = makeAuthController(participantAuth);
 
-export const createUser = asyncHandler(
-  async (req: Request, res: Response) => {
-    const response = await participantService.createUser(req.body);
-    if(!response.success){
-      return apiFailureResponse(res, response.message);
-    }
-    return apiSuccessResponse(res, response.message, response.data, 201);
+const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+
+/** Turns dob_day / dob_month / dob_year (month as a number or a name) into a Date, or null if it isn't a real date. */
+export function parseDob(day?: unknown, month?: unknown, year?: unknown): Date | null {
+  const d = Number(day);
+  const y = Number(year);
+  const mRaw = String(month ?? '').trim().toLowerCase();
+  let m = Number(mRaw);
+  if (!Number.isInteger(m) || m < 1) {
+    const idx = MONTHS.findIndex((name) => name.startsWith(mRaw.slice(0, 3)) && mRaw.length >= 3);
+    m = idx + 1;
   }
-);
+  if (!Number.isInteger(d) || !Number.isInteger(y) || m < 1 || m > 12) return null;
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (date.getUTCDate() !== d || date.getUTCMonth() !== m - 1) return null;
+  return date;
+}
 
-export const loginUser = asyncHandler(
-  async (req: Request, res: Response) => {
-    const response = await participantService.loginUser(req.body);
-    if(!response.success){
-      return apiFailureResponse(res, response.message);
-    }
-    return apiSuccessResponse(res, response.message, response.data, 201);
-  }
-);
+export function ageOn(dob: Date, now = new Date()) {
+  let age = now.getUTCFullYear() - dob.getUTCFullYear();
+  const beforeBirthday =
+    now.getUTCMonth() < dob.getUTCMonth() || (now.getUTCMonth() === dob.getUTCMonth() && now.getUTCDate() < dob.getUTCDate());
+  if (beforeBirthday) age -= 1;
+  return age;
+}
 
-export const verifyEmail = asyncHandler(
-  async (req: Request, res: Response) => {
-    const response = await participantService.verifyEmail(req);
-    if(!response.success){
-      return apiFailureResponse(res, response.message);
-    }
-    return apiSuccessResponse(res, response.message, response.data, 201);
+export const completeProfile = asyncHandler(async (req: Request, res: Response) => {
+  const answers = req.body as Record<string, string | number | boolean>;
+  const dob = parseDob(answers.dob_day, answers.dob_month, answers.dob_year);
+  if (answers.dob_day !== undefined || answers.dob_year !== undefined) {
+    if (!dob) throw new AppError('Enter a real date of birth.', 400);
+    const age = ageOn(dob);
+    if (age < 18) throw new AppError('You need to be 18 or older to take part in studies.', 400);
+    if (age > 110) throw new AppError('Check your year of birth.', 400);
   }
-);
 
-export const googleAuth = asyncHandler(
-  async (req: Request, res: Response) => {
-    const response = await participantService.googleAuth(req.body);
-    if(!response.success){
-      return apiFailureResponse(res, response.message);
-    }
-    return apiSuccessResponse(res, response.message, response.data, 201);
-  }
-);
+  const user = await ParticipantModel.findById(req.user!.id);
+  if (!user) throw new AppError('Account not found.', 404);
 
-export const getUser = asyncHandler(
-  async (req: Request, res: Response) => {
-    const response = await participantService.getUser(req);
-    if(!response.success){
-      return apiFailureResponse(res, response.message)
-    }
-    return apiSuccessResponse(res, response.message, response.data);
-  }
-);
+  const profile = { ...((user.profile as any)?.toObject?.() ?? user.profile ?? {}) };
+  for (const [k, v] of Object.entries(answers)) profile[k] = typeof v === 'string' ? v.trim() : String(v);
+  if (dob) profile.dateOfBirth = dob;
 
-export const completeProfile = asyncHandler(
-  async (req: Request, res: Response)=>{
-    const response = await participantService.completeProfile(req, req.body)
-    if(!response.success){
-      return apiFailureResponse(res, response.message)
-    }
-    return apiSuccessResponse(res, response.message, response.data)
-  }
-)
-
-export const getRefreshToken = asyncHandler(
-  async (req: Request, res: Response)=>{
-    const response = await participantService.getRefreshToken(req)
-    if(!response.success){
-      return apiFailureResponse(res, response.message)
-    }
-    return apiSuccessResponse(res, response.message, response.data)
-  }
-)
-
-export const sendOtp = asyncHandler(
-  async (req: Request, res: Response)=>{
-    const response = await participantService.sendOtp(req)
-    if(!response.success){
-      return apiFailureResponse(res, response.message)
-    }
-    return apiSuccessResponse(res, response.message, response.data)
-  }
-)
-
-export const verifyOtp = asyncHandler(
-  async (req: Request, res: Response)=>{
-    const response = await participantService.verifyOtp(req)
-    if(!response.success){
-      return apiFailureResponse(res, response.message)
-    }
-    return apiSuccessResponse(res, response.message, response.data)
-  }
-)
-
-export const resetPassword = asyncHandler(
-  async (req: Request, res: Response)=>{
-    const response = await participantService.resetPassword(req)
-    console.log({response})
-    if(!response.success){
-      return apiFailureResponse(res, response.message)
-    }
-    return apiSuccessResponse(res, response.message, response.data)
-  }
-)
+  user.set('profile', profile);
+  user.isCompleteProfile = true;
+  await user.save();
+  apiSuccessResponse(res, 'Profile saved. You can now see studies that match you.', user.toJSON());
+});

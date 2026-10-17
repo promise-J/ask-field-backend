@@ -13,14 +13,16 @@ export function apiSuccessResponse(
     });
   }
 
+/** Failure responses always carry success: false plus `error` and `message`, which the frontend's formatApiError reads. */
 export function apiFailureResponse(
     res: Response,
-    error = '',
+    error = 'Something went wrong.',
     statusCode = 400,
   ) {
     return res.status(statusCode).json({
       success: false,
-      error
+      error,
+      message: error,
     });
   }
 

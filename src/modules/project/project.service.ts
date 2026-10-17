@@ -1,147 +1,54 @@
-import { Request } from "express";
-import { serviceResponse } from "../../utils/apiResponse";
-import { ProjectRepository } from "./project.repository";
-import { title } from "process";
-import paginate from "../../utils/paginate";
-import { ProjectModel } from "./project.model";
-
-type CreateProjectReq = { participantView: string; title: string };
-
-const projectRepo = new ProjectRepository();
+import { isValidObjectId } from 'mongoose';
+import AppError from '../../error-helpers/appError';
+import { ProjectModel } from './project.model';
+import { SurveyModel } from '../survey/survey.model';
 
 export class ProjectService {
-  async createProject(userId: string, data: CreateProjectReq) {
-    try {
-      let projectExists = await projectRepo.findOne({
-        userId,
-        title: data.title,
-      });
-
-      if (projectExists) {
-        return serviceResponse(
-          false,
-          "Project with the same title already exists. Please choose a different title."
-        );
-      }
-
-      const project = await projectRepo.create({
-        userId,
-        title: data.title,
-        participantView: data.participantView,
-      });
-
-      return serviceResponse(true, "Project created successfully.", project);
-    } catch (error) {
-      console.log(error);
-      return serviceResponse(
-        false,
-        "Something went wrong. Please try again later"
-      );
-    }
+  async list(userId: string, page = 1, limit = 10) {
+    page = Math.max(1, Math.floor(page) || 1);
+    limit = Math.min(100, Math.max(1, Math.floor(limit) || 10));
+    const filter = { userId };
+    const [total, data] = await Promise.all([
+      ProjectModel.countDocuments(filter),
+      ProjectModel.find(filter)
+        .sort({ pinned: -1, pinnedAt: -1, updatedAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+    ]);
+    return { data, pagination: { total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) } };
   }
-  async listUserProjects(
-    userId: string,
-    options: { page?: number; limit?: number } = {}
-  ) {
-    try {
-      const result = await paginate(ProjectModel, { userId }, options);
 
-      return serviceResponse(true, "Projects fetched successfully.", result);
-    } catch (error) {
-      console.log(error);
-      return serviceResponse(
-        false,
-        "Something went wrong. Please try again later"
-      );
-    }
+  create(userId: string, data: { title: string; participantView?: string }) {
+    return ProjectModel.create({ ...data, userId });
   }
-  async getProjectById(projectId: string) {
-    try {
-      const project = await projectRepo.findById(projectId);
 
-      if (!project) {
-        return serviceResponse(false, "Project not found.");
-      }
-
-      return serviceResponse(true, "Project fetched successfully.", project);
-    } catch (error) {
-      console.log(error);
-      return serviceResponse(
-        false,
-        "Something went wrong. Please try again later."
-      );
-    }
+  /** Only the owner can see or change a project. Anyone else gets 404, so ids can't be probed. */
+  async getOwned(userId: string, id: string) {
+    if (!isValidObjectId(id)) throw new AppError('Project not found.', 404);
+    const project = await ProjectModel.findOne({ _id: id, userId });
+    if (!project) throw new AppError('Project not found.', 404);
+    return project;
   }
-  async deleteProject(projectId: string) {
-    try {
-      const project = await projectRepo.findById(projectId);
 
-      if (!project) {
-        return serviceResponse(false, "Project not found.");
-      }
-
-      await projectRepo.deleteById(projectId);
-
-      return serviceResponse(true, "Project deleted successfully.");
-    } catch (error) {
-      console.log(error);
-      return serviceResponse(
-        false,
-        "Something went wrong. Please try again later."
-      );
-    }
+  async rename(userId: string, id: string, title: string) {
+    const project = await this.getOwned(userId, id);
+    project.title = title;
+    return project.save();
   }
-  async renameProject(projectId: string, newTitle: string) {
-    try {
-      const project = await projectRepo.findById(projectId);
 
-      if (!project) {
-        return serviceResponse(false, "Project not found.");
-      }
-
-      // Check if another project with the new title already exists for the same user
-      const existingProject = await projectRepo.findOne({
-        userId: project.userId,
-        title: newTitle,
-      });
-
-      if (existingProject) {
-        return serviceResponse(
-          false,
-          "Another project with the same title already exists. Please choose a different title."
-        );
-      }
-
-      project.title = newTitle;
-      await project.save();
-
-      return serviceResponse(true, "Project renamed successfully.", project);
-    } catch (error) {
-      console.log(error);
-      return serviceResponse(
-        false,
-        "Something went wrong. Please try again later."
-      );
-    }
+  /** Toggles the pin. */
+  async togglePin(userId: string, id: string) {
+    const project = await this.getOwned(userId, id);
+    project.pinned = !project.pinned;
+    project.pinnedAt = project.pinned ? new Date() : null;
+    return project.save();
   }
-  async pinProject(projectId: string) {
-    try {
-      const project = await projectRepo.findById(projectId);
 
-      if (!project) {
-        return serviceResponse(false, "Project not found.");
-      }
-
-      project.pinned = true;
-      await project.save();
-
-      return serviceResponse(true, "Project pinned successfully.", project);
-    } catch (error) {
-      console.log(error);
-      return serviceResponse(
-        false,
-        "Something went wrong. Please try again later."
-      );
-    }
+  async remove(userId: string, id: string) {
+    const project = await this.getOwned(userId, id);
+    const live = await SurveyModel.countDocuments({ projectId: project._id, status: 'published' });
+    if (live > 0) throw new AppError('Close the live studies in this project before deleting it.', 409);
+    await SurveyModel.deleteMany({ projectId: project._id, status: 'draft' });
+    await project.deleteOne();
   }
 }

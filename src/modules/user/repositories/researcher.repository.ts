@@ -1,15 +1,20 @@
 import { ResearcherModel } from '../models/researcher.model';
 
+const SECRETS = '+password +verificationToken +verificationTokenExpires +otp +otpExpires +otpAttempts +resetToken +resetTokenExpires';
+
 export class ResearcherRepository {
-  async create(data: any) {
-    return await ResearcherModel.create(data);
+  model = ResearcherModel;
+
+  create(data: any) {
+    return ResearcherModel.create(data);
   }
 
-  async findByEmail(email: string) {
-    return await ResearcherModel.findOne({ email });
+  findByEmail(email: string, withSecrets = false) {
+    const q = ResearcherModel.findOne({ email: email.toLowerCase().trim() });
+    return withSecrets ? q.select(SECRETS) : q;
   }
 
-  async findById(id: string) {
-    return await ResearcherModel.findById(id);
+  findById(id: string) {
+    return ResearcherModel.findById(id);
   }
 }

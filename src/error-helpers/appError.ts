@@ -8,9 +8,15 @@ class AppError extends Error {
     statusCode: number;
     status: string;
     isOperational: boolean;
+    /** Stable, machine-readable reason the frontend can switch on, e.g. "link_expired". */
+    code?: string;
+    /** Extra details for the frontend, e.g. { retryAfter: 42 }. */
+    data?: Record<string, unknown>;
     
-    constructor(message: string, statusCode: number) {
+    constructor(message: string, statusCode: number, code?: string, data?: Record<string, unknown>) {
         super(message);
+        this.code = code;
+        this.data = data;
         this.statusCode = statusCode;
         this.status = `${statusCode}`.startsWith("4") ? "fail" : "error";
         this.isOperational = true;

@@ -1,82 +1,36 @@
 import { NextFunction, Request, Response } from "express";
-import { env } from "../config";
-
-const AppLogger = require("../middlewares/logger");
-const Auth0Error = require("./auth0Error");
-const MongoDBError = require("./mongoDBError");
-
-/**
- * Sends error to developers with all details, and used for developement stage.
- * @param {Error} err - Error object
- * @param {Response} res - ExpressJS response object
- */
-const sendDevelopmentError = (err: any, res: Response) => {
-    res.status(err.statusCode).json({
-        status: err.status,
-        // error: err,
-        message: err.message,
-        // stack: err.stack,
-    });
-};
-
-/**
- * Sends limited messages of an error to the end user.
- * @param {AppError} err - AppError object
- * @param {Response} res - ExpressJS response object
- */
-const sendProductionError = (err:any, res: Response) => {
-    if (err.isOperational) {
-        res.status(err.statusCode).json({
-            status: err.status,
-            message: err.message,
-        });
-    } else {
-        // if not operational, log it on console and send generic message.
-        AppLogger.error(err.stack);
-
-        res.status(500).json({
-            status: "error",
-            message: "Something went wrong!",
-        });
-    }
-};
+import logger from "../config/logger";
+import MongoDBError from "./mongoDBError";
 
 /**
  * Error handling middleware at the application level.
- *
- * @param {Error} err - The error object that occurred in the application
- * @param {Request} req - The request object that contains information about the incoming request
- * @param {Response} res - The response object that will be used to send a response back to the client
- * @param {function} next - A function that can be called to pass control to the next middleware function in the chain
- *
- * This middleware handles all errors that occur in the application and sends appropriate
- * responses to the client depending on the environment (development or production).
- * In development mode, all error details are sent to the developer.
- * In production mode, limited error details are sent to the client.
+ * Every error response has { success: false, status, error, message } so the frontend can show `error` or `message`.
+ * Known database errors become friendly 4xx messages; unexpected errors are logged and hidden in production.
  */
-export default (err: any, req: Request, res: Response, next: NextFunction) => {
-    // for auth0, the http status code is in status property instead of statusCode
-    // in dev mode, we will have all details but in production mode, this will give at least the right status code
-    err.statusCode = err.statusCode || err.status || 500;
-    err.status = err.status || "error";
+export default (err: any, req: Request, res: Response, _next: NextFunction) => {
+    let error = err;
+    if (error?.name === "ValidationError" && error.errors) error = MongoDBError.handleValidationError(error);
+    else if (error?.name === "CastError") error = MongoDBError.handleCastError(error);
+    else if (error?.code === 11000) error = MongoDBError.handleDuplicateField(error);
+    else if (error?.type === "entity.parse.failed") error = { statusCode: 400, isOperational: true, message: "The request body isn't valid JSON." };
 
-    if (env.NODE_ENV === "development") {
-        sendDevelopmentError(err, res);
-    } else {
-        let error = Object.create(err, Object.getOwnPropertyDescriptors(err));
-        if (error.name === "ValidationError")
-            error = MongoDBError.handleValidationError(error);
+    const statusCode = Number(error.statusCode) || 500;
+    const operational = Boolean(error.isOperational) || statusCode < 500;
 
-        if (error.name === "CastError")
-            error = MongoDBError.handleCastError(error);
+    if (!operational) logger.error({ err }, "Unhandled error");
+    if (process.env.DEBUG_ERRORS && !operational) console.error(err);
 
-        if (error.code === 11000)
-            error = MongoDBError.handleDuplicateField(error);
+    const message =
+        operational || process.env.NODE_ENV === "development"
+            ? error.message || "Something went wrong!"
+            : "Something went wrong!";
 
-        if (error.name === "invalid_grant")
-            error = Auth0Error.handleInvalidPassword(error);
-        if (error.name === "APIError") error = Auth0Error.handleAPIError(error);
-
-        sendProductionError(error, res);
-    }
+    res.status(statusCode).json({
+        success: false,
+        status: `${statusCode}`.startsWith("4") ? "fail" : "error",
+        error: message,
+        message,
+        ...(operational && typeof error.code === "string" ? { code: error.code } : {}),
+        ...(operational && error.data ? { data: error.data } : {}),
+    });
 };

@@ -1,58 +1,29 @@
-import { Request, Response } from "express";
-import { ResearcherService } from "../services/researcher.service";
-import { asyncHandler } from "../../../utils/asyncHandler";
-import {
-  apiFailureResponse,
-  apiSuccessResponse,
-} from "../../../utils/apiResponse";
-import { PaymentService } from "../../payment/services/payment.service";
+import { ResearcherModel } from '../models/researcher.model';
+import { AuthService } from '../services/auth.service';
+import { makeAuthController } from './auth.controller';
+import { Request, Response } from 'express';
+import { asyncHandler } from '../../../utils/asyncHandler';
+import { apiSuccessResponse } from '../../../utils/apiResponse';
+import AppError from '../../../error-helpers/appError';
 
-const researcherService = new ResearcherService();
-const paymentService = new PaymentService();
+export const researcherAuth = new AuthService(ResearcherModel, 'researcher');
+export const researcherController = makeAuthController(researcherAuth);
 
-export const createUser = asyncHandler(async (req: Request, res: Response) => {
-  const response = await researcherService.createUser(req.body);
-  if (!response.success) {
-    return apiFailureResponse(res, response.message);
-  }
-  return apiSuccessResponse(res, response.message, response.data, 201);
-});
-
-export const loginUser = asyncHandler(async (req: Request, res: Response) => {
-  const response = await researcherService.loginUser(req.body);
-  if (!response.success) {
-    return apiFailureResponse(res, response.message);
-  }
-  return apiSuccessResponse(res, response.message, response.data, 201);
-});
-export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
-  const response = await researcherService.verifyEmail(req);
-  if (!response.success) {
-    return apiFailureResponse(res, response.message);
-  }
-  return apiSuccessResponse(res, response.message, response.data, 201);
-});
-
-export const getUser = asyncHandler(async (req: Request, res: Response) => {
-  const response = await researcherService.getUser(req);
-  if (!response.success) {
-    return apiFailureResponse(res, response.message);
-  }
-  return apiSuccessResponse(res, response.message, response.data, 201);
-});
-
-export const researcherDashboardStats = asyncHandler(async (req: Request, res: Response) => {
-  const response = await researcherService.researcherDashboardStats(req);
-  if (!response.success) {
-    return apiFailureResponse(res, response.message);
-  }
-  return apiSuccessResponse(res, response.message, response.data, 201);
-});
-
-export const acceptPayment = asyncHandler(async (req: Request, res: Response) => {
-  const response = await paymentService.acceptPayment(req);
-  if (!response.success) {
-    return apiFailureResponse(res, response.message);
-  }
-  return apiSuccessResponse(res, response.message, response.data, 201);
+export const completeResearcherProfile = asyncHandler(async (req: Request, res: Response) => {
+  const b = req.body;
+  const user = await ResearcherModel.findById(req.user!.id);
+  if (!user) throw new AppError('Account not found.', 404);
+  user.set({
+    firstName: b.firstName,
+    lastName: b.lastName,
+    organizationName: b.organization,
+    country: user.country || b.country,
+    purposeHere: b.purposeHere,
+    researchType: b.researchType,
+    researchInterest: b.researchInterest,
+    address: { street: b.street, address2: b.address2, city: b.city, country: b.country },
+    isCompleteProfile: true,
+  });
+  await user.save();
+  apiSuccessResponse(res, 'Profile saved.', user.toJSON());
 });

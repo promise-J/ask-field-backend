@@ -1,22 +1,14 @@
-import { Schema, model } from "mongoose";
+import { Schema, model, Types } from 'mongoose';
 
-export interface IProject extends Document {
-  userId: Schema.Types.ObjectId;
-  title: string;
-  participantView: string;
-  pinned?: boolean;
-  pinnedAt?: Date;
-}
-
-const projectSchema = new Schema<IProject>(
+const projectSchema = new Schema(
   {
-    userId: { type: Schema.Types.ObjectId, required: true, trim: true },
-    title: { type: String, required: true, trim: true },
-    participantView: { type: String, required: true, trim: true },
+    userId: { type: Types.ObjectId, ref: 'Researcher', required: true, index: true },
+    title: { type: String, required: true, trim: true, maxlength: 120 },
+    participantView: { type: String, trim: true, default: '' },
     pinned: { type: Boolean, default: false },
-    pinnedAt: { type: Date },
+    pinnedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
 
-export const ProjectModel = model("Project", projectSchema);
+export const ProjectModel = model('Project', projectSchema);
