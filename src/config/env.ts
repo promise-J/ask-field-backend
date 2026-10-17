@@ -23,7 +23,7 @@ const envSchema = z.object({
 
 
   // Where the React app lives. Used to build links in emails.
-  FRONTEND_URL: z.string().default('http://localhost:5173'),
+  FRONTEND_URL: z.string().default('https://joinstudy.io'),
   // Comma-separated list of allowed browser origins. Empty = allow all (development only).
   CORS_ORIGINS: z.string().optional(),
 
