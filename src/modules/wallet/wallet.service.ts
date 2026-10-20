@@ -90,17 +90,18 @@ export const ledger = {
 export class WalletService {
   async participantSummary(participantId: string) {
     const owner = new Types.ObjectId(participantId);
-    const [pending, earned, paidOut, inFlight, transactions] = await Promise.all([
+    const [pending, earned, paidOut, inFlight, forfeited, transactions] = await Promise.all([
       sum({ ownerId: owner, kind: 'earning', status: 'pending' }),
       sum({ ownerId: owner, kind: 'earning', status: 'available' }),
       sum({ ownerId: owner, kind: 'payout', status: 'paid' }),
       sum({ ownerId: owner, kind: 'payout', status: { $in: ['pending', 'processing'] } }),
+      sum({ ownerId: owner, kind: 'forfeit' }),
       TransactionModel.find({ ownerId: owner }).sort({ createdAt: -1 }).limit(100),
     ]);
     return {
       currency: env.DEFAULT_CURRENCY,
       pending,
-      available: round(earned - paidOut - inFlight),
+      available: round(earned - paidOut - inFlight - forfeited),
       processing: inFlight,
       paidOut,
       totalEarned: round(earned + pending),
@@ -108,44 +109,6 @@ export class WalletService {
       completedStudies: transactions.filter((t: any) => t.kind === 'earning' && t.status !== 'cancelled').length,
       transactions: await withTitles(transactions),
     };
-  }
-
-  async savePayoutDetails(participantId: string, details: Record<string, string>) {
-    const user = await ParticipantModel.findById(participantId);
-    if (!user) throw new AppError('Account not found.', 404);
-    user.set('payoutDetails', details);
-    await user.save();
-    return user.toJSON();
-  }
-
-  /** Requests a withdrawal of the available balance (or part of it). Payouts are then sent by the operations team. */
-  async requestPayout(participantId: string, amount?: number) {
-    const user = await ParticipantModel.findById(participantId);
-    if (!user) throw new AppError('Account not found.', 404);
-    const details: any = user.payoutDetails;
-    if (!details?.accountNumber) throw new AppError('Add your payout details first.', 400);
-
-    const { available, currency } = await this.participantSummary(participantId);
-    const value = round(amount ?? available);
-    if (value <= 0) throw new AppError('You have no balance to withdraw yet.', 400);
-    if (value > available) throw new AppError('That is more than your available balance.', 400);
-    if (value < config.minPayoutAmount) throw new AppError(`The minimum withdrawal is ${config.minPayoutAmount} ${currency}.`, 400);
-
-    return TransactionModel.create({
-      ownerId: participantId,
-      ownerType: 'participant',
-      kind: 'payout',
-      status: 'pending',
-      amount: value,
-      currency,
-      description: 'Withdrawal request',
-      payoutDetails: {
-        method: details.method,
-        bankName: details.bankName,
-        accountName: details.accountName,
-        accountNumberLast4: String(details.accountNumber).slice(-4),
-      },
-    });
   }
 
   async researcherSummary(researcherId: string) {
@@ -164,7 +127,12 @@ export class WalletService {
       spent,
       feeRate: config.platformFeeRate,
       credit: await creditBalance(researcherId),
-      fundings: fundings.map((f: any) => ({ ...f.toJSON(), title: titles.get(String(f.surveyId)) || 'Study' })),
+      // Stage 9: who in the workspace paid each one.
+      fundings: await (async () => {
+        const { ResearcherModel } = await import('../user/models/researcher.model');
+        const payers = new Map((await ResearcherModel.find({ _id: { $in: fundings.map((f: any) => f.paidBy).filter(Boolean) } }).select('firstName lastName')).map((p: any) => [String(p._id), [p.firstName, p.lastName].filter(Boolean).join(' ')]));
+        return fundings.map((f: any) => ({ ...f.toJSON(), title: titles.get(String(f.surveyId)) || 'Study', paidByName: payers.get(String(f.paidBy)) || '' }));
+      })(),
       transactions: await withTitles(transactions),
     };
   }

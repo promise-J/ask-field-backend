@@ -57,7 +57,7 @@ router.post('/me/verification/link', ...researcherOnly, validate(staffLinkSchema
 }));
 // Stage 3: the researcher home and the founding-lab card
 router.get('/me/home', ...researcherOnly, asyncHandler(async (req: any, res: any) => {
-  apiSuccessResponse(res, 'ok', await homeSummary(req.user.id));
+  apiSuccessResponse(res, 'ok', await homeSummary(req.user.id, req.user.selfId));
 }));
 router.post('/me/founding-lab', ...researcherOnly, validate(foundingLabSchema), asyncHandler(async (req: any, res: any) => {
   const data = await foundingLab(req.user.id, req.body.action);

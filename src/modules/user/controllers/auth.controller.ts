@@ -42,7 +42,7 @@ export function makeAuthController(service: AuthService) {
 
     refreshToken: asyncHandler(async (req: Request, res: Response) => {
       const header = req.headers.token;
-      const tokens = refreshAccessToken(Array.isArray(header) ? header[0] : header);
+      const tokens = await refreshAccessToken(Array.isArray(header) ? header[0] : header);
       apiSuccessResponse(res, 'Session refreshed.', tokens);
     }),
 
@@ -62,7 +62,7 @@ export function makeAuthController(service: AuthService) {
     }),
 
     me: asyncHandler(async (req: Request, res: Response) => {
-      apiSuccessResponse(res, 'Account fetched.', await service.me(req.user!.id));
+      apiSuccessResponse(res, 'Account fetched.', await service.me(req.user!.selfId || req.user!.id)); // the person signed in, whichever workspace (Stage 9)
     }),
   };
 }

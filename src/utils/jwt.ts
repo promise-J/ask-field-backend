@@ -6,6 +6,10 @@ export type UserType = 'participant' | 'researcher';
 export interface TokenPayload {
   id: string;
   userType: UserType;
+  /** One sign-in (a device). Lets "Sign out everywhere else" keep this one (Participant Stage 7). */
+  sid?: string;
+  /** When it was issued, in milliseconds (token `iat` is whole seconds). */
+  at?: number;
 }
 
 export function signAccessToken(payload: TokenPayload) {
@@ -24,6 +28,7 @@ export function verifyRefreshToken(token: string) {
   return jwt.verify(token, config.refreshSecret) as TokenPayload;
 }
 
-export function issueTokens(payload: TokenPayload) {
+export function issueTokens(input: TokenPayload) {
+  const payload: TokenPayload = { id: input.id, userType: input.userType, ...(input.sid ? { sid: input.sid } : {}), at: Date.now() };
   return { accessToken: signAccessToken(payload), refreshToken: signRefreshToken(payload) };
 }

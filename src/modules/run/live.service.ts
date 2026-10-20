@@ -1,3 +1,4 @@
+import { declineCounts, leaveCounts } from '../studies/studies.service';
 import { isValidObjectId, Types } from 'mongoose';
 import AppError from '../../error-helpers/appError';
 import { env } from '../../config/env';
@@ -72,6 +73,7 @@ export async function liveView(userId: string, id: string, now = new Date()) {
     method,
     status: s.status === 'published' ? 'live' : s.status,
     paused: !!s.paused,
+    reportHold: Boolean(s.reportHold?.at),
     publishedAt: s.publishedAt,
     closedAt: s.closedAt || null,
     closes: plan.pay?.closes === 'date' ? plan.pay.closesAt : null,
@@ -85,6 +87,10 @@ export async function liveView(userId: string, id: string, now = new Date()) {
     bookings,
     money: { paidIn: inSoFar, paidOut, held: round(Math.max(0, inSoFar - paidOut)), currency: s.currency || env.DEFAULT_CURRENCY },
     perPerson: Number(plan.pay?.perPerson) || 0,
+    // Participant Stage 3: how many people said "Not interested", and why. Totals only.
+    declines: await declineCounts(s._id),
+    // Participant Stage 4: people who left or ran out of time (totals only).
+    leaves: await leaveCounts(s._id),
     returnLink: s.returnCode ? `${env.FRONTEND_URL.replace(/\/$/, '')}/done/${s.returnCode}` : null,
   };
 }
@@ -99,6 +105,8 @@ export async function participantsOf(userId: string, id: string) {
 export async function setPaused(userId: string, id: string, paused: boolean) {
   const s = await owned(userId, id);
   if (s.status !== 'published') throw new AppError('Only a live study can be paused.', 409);
+  // Participant Stage 7: a pause after reports from participants is lifted by joinStudy, once we've checked.
+  if (!paused && s.reportHold?.at) throw new AppError('joinStudy paused this study after reports from participants. We’ll email you once we’ve checked it, within 1 working day.', 409, 'report_hold');
   s.paused = paused;
   await s.save();
   return liveView(userId, id);
@@ -122,6 +130,7 @@ export async function closeEarly(userId: string, id: string) {
   if (s.status !== 'published') throw new AppError('This study isn’t live.', 409);
   s.status = 'closed';
   s.closedAt = new Date();
+  s.closedReason = 'early';
   s.paused = false;
   await s.save();
   await cancelFutureBookings(s._id);

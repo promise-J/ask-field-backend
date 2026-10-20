@@ -8,3 +8,4 @@ process.env.MIN_PAYOUT_AMOUNT = '1000';
 process.env.DEFAULT_CURRENCY = 'NGN';
 delete process.env.SMTP_HOST;
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
+process.env.REQUIRE_PARTICIPANT_VERIFICATION = 'false'; // the participant Stage 1 suite turns it on

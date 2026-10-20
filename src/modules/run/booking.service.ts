@@ -8,6 +8,7 @@ import { ResearcherModel } from '../user/models/researcher.model';
 import { SurveyService } from '../survey/survey.service';
 import { BookingModel } from './booking.model';
 import { daysBetween, formatIn, isTimeZone, zonedToUtc } from './time';
+import { studyContact } from '../team/contact';
 
 /**
  * Stage 6: interview and focus-group bookings. Times come from the plan (weekly free times or sessions),
@@ -111,10 +112,10 @@ export async function book(participantId: string, id: string, input: { start: st
   if (!slot) throw new AppError('That time was just taken. Choose another.', 409, 'slot_taken');
   const tz = input.timeZone && isTimeZone(input.timeZone) ? input.timeZone : 'Africa/Lagos';
   const b: any = await BookingModel.create({ surveyId: s._id, researcherId: s.userId, participantId, surveyActionId: action._id, start: slot.start, end: slot.end, participantTz: tz });
-  const [p, r]: any[] = await Promise.all([ParticipantModel.findById(participantId).select('email firstName'), ResearcherModel.findById(s.userId).select('email')]);
+  const [p, contact]: any[] = await Promise.all([ParticipantModel.findById(participantId).select('email firstName'), studyContact(s, 'bookings')]);
   const title = s.plan?.basics?.title || s.surveyName;
   await sendMail({ to: p?.email, subject: `Booked: ${title}`, text: `You're booked for ${formatIn(slot.start, tz)} (your time). We'll remind you the day before and an hour before. You can move or cancel up to 12 hours before.` });
-  await sendMail({ to: r?.email, subject: `New booking: ${action.code || 'a participant'} for "${title}"`, text: `${formatIn(slot.start, s.plan?.setup?.timeZone || 'UTC')} (your time).` });
+  await sendMail({ to: contact, subject: `New booking: ${action.code || 'a participant'} for "${title}"`, text: `${formatIn(slot.start, s.plan?.setup?.timeZone || 'UTC')} (your time).` });
   return participantBookingView(s, b);
 }
 
@@ -225,8 +226,7 @@ export async function sendDueReminders(now = new Date()) {
       const link = b.videoUrl || (s?.plan?.setup?.videoMode === 'each' ? '' : s?.plan?.setup?.videoUrl || '');
       await sendMail({ to: p?.email, subject: `Reminder: ${s?.plan?.basics?.title || 'your joinStudy session'} ${when}`, text: `${formatIn(b.start, b.participantTz)} (your time).${link ? ` Join here: ${link}` : ' We’ll send the link soon.'}` });
       if (field === 'reminded1') {
-        const r: any = await ResearcherModel.findById(b.researcherId).select('email');
-        await sendMail({ to: r?.email, subject: 'Your session starts in an hour', text: `${formatIn(b.start, s?.plan?.setup?.timeZone || 'UTC')} (your time).${link ? '' : ' Add the meeting link for this booking.'}` });
+        await sendMail({ to: (await studyContact(s, 'bookings')) as string, subject: 'Your session starts in an hour', text: `${formatIn(b.start, s?.plan?.setup?.timeZone || 'UTC')} (your time).${link ? '' : ' Add the meeting link for this booking.'}` });
       }
       b[field] = now;
       await b.save();

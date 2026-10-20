@@ -14,7 +14,7 @@ export const createDraftSurvey = asyncHandler(async (req: Request, res: Response
 });
 
 export const startStudy = asyncHandler(async (req: Request, res: Response) => {
-  apiSuccessResponse(res, 'Draft started.', await service.start(req.user!.id, req.body), 201);
+  apiSuccessResponse(res, 'Draft started.', await service.start(req.user!.id, req.body, req.user!.selfId), 201);
 });
 
 export const updateDraftSurvey = asyncHandler(async (req: Request, res: Response) => {
@@ -99,8 +99,9 @@ export const startLink = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const finishByCode = asyncHandler(async (req: Request, res: Response) => {
-  const { action, message } = await service.submitByCode(req.user!.id, req.params.code);
-  apiSuccessResponse(res, message, action);
+  const { action, message, outcome } = await service.submitByCode(req.user!.id, req.params.code);
+  // Participant Stage 4: the thank-you page says what's counted and when it's paid.
+  apiSuccessResponse(res, message, { ...(action?.toJSON ? action.toJSON() : action), outcome, surveyId: String(action?.surveyId ?? '') });
 });
 
 // ---------- Stage 5: fund and launch ----------
@@ -108,7 +109,7 @@ export const getLaunch = asyncHandler(async (req: Request, res: Response) => {
   apiSuccessResponse(res, 'ok', await launch.launchView(req.user!.id, req.params.id));
 });
 export const launchPay = asyncHandler(async (req: Request, res: Response) => {
-  apiSuccessResponse(res, 'ok', await launch.pay(req.user!.id, req.params.id, req.body), 201);
+  apiSuccessResponse(res, 'ok', await launch.pay(req.user!.id, req.params.id, { ...req.body, paidBy: req.user!.selfId }), 201);
 });
 export const launchResubmit = asyncHandler(async (req: Request, res: Response) => {
   apiSuccessResponse(res, 'Sent back to us.', await launch.resubmit(req.user!.id, req.params.id));

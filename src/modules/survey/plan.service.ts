@@ -12,7 +12,7 @@ import {
   missingByStep,
   newReturnCode,
   placesAndMinutes,
-  profileMatches,
+  fitsStudy,
   stepSchema,
   STEPS,
   type Method,
@@ -126,10 +126,13 @@ export async function saveStep(userId: string, id: string, step: Step, data: Rec
  */
 export async function matchCount(userId: string, id: string) {
   const s: any = await owned(userId, id);
-  const audience = s.plan?.audience || { countries: ['Nigeria'] };
-  const people = await ParticipantModel.find({ isCompleteProfile: true }).select('profile').limit(100000).lean();
+  const plan = { ...(s.plan || {}), audience: s.plan?.audience || { countries: ['Nigeria'] } };
+  // Participant Stage 2: researchers only ever see verified people counted (when verification is on).
+  const filter: Record<string, unknown> = { isCompleteProfile: true };
+  if (env.REQUIRE_PARTICIPANT_VERIFICATION) filter['verification.status'] = 'verified';
+  const people = await ParticipantModel.find(filter).select('profile linkedin').limit(100000).lean();
   let count = 0;
-  for (const p of people) if (profileMatches(audience, p).ok) count++;
+  for (const p of people) if (fitsStudy(plan, p).ok) count++;
   return { count, total: people.length };
 }
 
@@ -166,6 +169,9 @@ export async function recordConsentAndStartLink(participantId: string, surveyId:
   ]);
   if (!s) throw new AppError('This study is no longer taking participants.', 403);
   if (!action || action.status !== 'in-progress') throw new AppError('Check you can take part first.', 409, 'not_started');
+  if (action.heldUntil && new Date(action.heldUntil) <= new Date()) {
+    throw new AppError('Your time for this study ran out. Start again if there’s still a place.', 409, 'timed_out');
+  }
   const view = participantView(s);
   if (view.consent.required && !consent) throw new AppError('Please read and agree to the consent information first.', 400, 'consent_required');
   if (view.consent.required && !action.get('consentedAt')) {

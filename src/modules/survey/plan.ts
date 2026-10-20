@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { config } from '../../config/env';
+import { ALL_LANGUAGES, REGIONS } from '../user/profile.options';
 
 /**
  * Stage 4: the study planner. A study's plan lives in `survey.plan`, saved one step at a time:
@@ -12,10 +13,15 @@ export type Method = (typeof METHODS)[number];
 export const STEPS = ['basics', 'audience', 'setup', 'pay'] as const;
 export type Step = (typeof STEPS)[number];
 
-/** Countries participants can be recruited from today. Ghana and Kenya are "opening next". */
-export const OPEN_COUNTRIES = ['Nigeria'];
-export const GENDERS = ['woman', 'man', 'non-binary', 'self-described'] as const;
-export const LANGUAGES = ['English', 'Nigerian Pidgin', 'Yoruba', 'Igbo', 'Hausa', 'French', 'Twi', 'Swahili'] as const;
+/** Countries participants can be recruited from: the participant countries (PARTICIPANT_COUNTRIES). */
+export const OPEN_COUNTRIES = config.participantCountries;
+/** Participant Stage 2: the profile asks Female or Male; older plans may still say woman/man. */
+export const GENDERS = ['female', 'male'] as const;
+export const LANGUAGES = ALL_LANGUAGES;
+export const toSex = (v: unknown) => {
+  const x = String(v ?? '').trim().toLowerCase();
+  return x === 'woman' || x === 'female' ? 'female' : x === 'man' || x === 'male' ? 'male' : x;
+};
 export const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 const text = (max: number) => z.string().trim().max(max);
@@ -49,22 +55,27 @@ const question = z.object({
 
 export const audienceSchema = z
   .object({
-    countries: z.array(z.string()).min(1, 'Choose at least one country.').refine((c) => c.every((x) => OPEN_COUNTRIES.includes(x)), 'We can only recruit in Nigeria right now.'),
+    countries: z.array(z.string()).min(1, 'Choose at least one country.').refine((c) => c.every((x) => OPEN_COUNTRIES.includes(x)), `We can recruit in ${OPEN_COUNTRIES.join(', ')} right now.`),
+    // Participant Stage 2: states, regions or counties within those countries. Empty = anywhere in them.
+    regions: z.array(z.string().trim().max(60)).max(60).default([]),
     includeDiaspora: z.boolean().default(false),
     minAge: int(18, 100, 'Ages are from 18 to 100.').default(18),
     maxAge: int(18, 100, 'Ages are from 18 to 100.').default(100),
-    genders: z.array(z.enum(GENDERS)).default([]), // empty = anyone
-    languages: z.array(z.enum(LANGUAGES)).default([]),
+    genders: z.preprocess((v) => (Array.isArray(v) ? [...new Set(v.map(toSex))] : v), z.array(z.enum(GENDERS, { message: 'Gender is Female or Male.' }))).default([]), // empty = anyone
+    languages: z.array(z.string().refine((l) => LANGUAGES.includes(l), 'Choose languages from the list.')).default([]),
+    // Only people who've connected LinkedIn (participant Stage 2). Narrows the sample: the planner says so.
+    linkedinOnly: z.boolean().default(false),
     education: z.enum(['any', 'secondary', 'degree', 'postgraduate']).default('any'),
     employment: z.enum(['any', 'employed', 'self-employed', 'not-working']).default('any'),
     students: z.enum(['include', 'only', 'exclude']).default('include'),
     questions: z.array(question).max(3, 'Up to 3 questions.').default([]),
     quota: z
-      .object({ by: z.enum(['gender', 'language']), groups: z.array(z.object({ value: text(60).min(1), places: int(1, 100000) })).min(2, 'A quota needs at least 2 groups.') })
+      .object({ by: z.enum(['gender', 'language']), groups: z.array(z.object({ value: z.preprocess((v) => (typeof v === 'string' && ['woman', 'man'].includes(v.toLowerCase()) ? toSex(v) : v), text(60).min(1)), places: int(1, 100000) })).min(2, 'A quota needs at least 2 groups.') })
       .nullable()
       .default(null),
   })
-  .refine((a) => a.minAge <= a.maxAge, { message: 'The youngest age must be lower than the oldest.', path: ['maxAge'] });
+  .refine((a) => a.minAge <= a.maxAge, { message: 'The youngest age must be lower than the oldest.', path: ['maxAge'] })
+  .refine((a) => a.regions.every((r) => a.countries.some((c) => REGIONS[c]?.list.includes(r))), { message: 'Choose places in the countries you picked.', path: ['regions'] });
 
 const surveySetup = z.object({
   url: url('Enter your survey link, starting with https://'),
@@ -228,10 +239,9 @@ export function legacyFields(method: Method, plan: any) {
 const norm = (v: unknown) => String(v ?? '').trim().toLowerCase();
 const COUNTRY_ALIASES: Record<string, string> = { usa: 'united states', us: 'united states', 'united states of america': 'united states', uk: 'united kingdom' };
 const country = (v: unknown) => COUNTRY_ALIASES[norm(v)] ?? norm(v);
-const GENDER_OF: Record<string, string> = { male: 'man', man: 'man', female: 'woman', woman: 'woman', 'non-binary': 'non-binary', nonbinary: 'non-binary' };
-const EDU_RANK: Record<string, number> = { ssce: 1, waec: 1, secondary: 1, ond: 2, nce: 2, hnd: 2, diploma: 2, bsc: 3, ba: 3, bachelor: 3, degree: 3, msc: 4, ma: 4, mba: 4, phd: 5, doctorate: 5 };
+const EDU_RANK: Record<string, number> = { none: 0, primary: 0, ssce: 1, waec: 1, secondary: 1, ond: 2, nce: 2, hnd: 2, diploma: 2, bsc: 3, ba: 3, bachelor: 3, degree: 3, msc: 4, ma: 4, mba: 4, master: 4, phd: 5, doctorate: 5 };
 const EDU_MIN: Record<string, number> = { any: 0, secondary: 1, degree: 3, postgraduate: 4 };
-const listOf = (v: unknown) => (Array.isArray(v) ? v : String(v ?? '').split(/[,;/]/)).map(norm).filter(Boolean);
+const listOf = (v: unknown) => (Array.isArray(v) ? v : [v]).flatMap((x) => String(x ?? '').split(/[,;/]/)).map(norm).filter(Boolean);
 
 /** Does this participant's profile fit the audience? A filter that's set needs the profile to answer it. */
 export function profileMatches(audience: any, participant: any, now = new Date()): { ok: boolean; reason?: string } {
@@ -251,7 +261,10 @@ export function profileMatches(audience: any, participant: any, now = new Date()
     if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
     if (age < (a.minAge ?? 18) || age > (a.maxAge ?? 120)) return { ok: false, reason: `This study is for people aged ${a.minAge ?? 18}–${a.maxAge ?? 100}.` };
   }
-  if (a.genders?.length && !a.genders.includes(GENDER_OF[norm(p.gender)] ?? norm(p.gender))) {
+  if (a.regions?.length && !a.regions.includes(p.region)) {
+    return { ok: false, reason: 'This study is looking for people in other places.' };
+  }
+  if (a.genders?.length && !a.genders.map(toSex).includes(toSex(p.gender))) {
     return { ok: false, reason: 'This study is looking for a different group of people. Keep an eye out for the next one.' };
   }
   if (a.languages?.length) {
@@ -274,14 +287,32 @@ export function profileMatches(audience: any, participant: any, now = new Date()
   return { ok: true };
 }
 
+/**
+ * Participant Stage 2: the whole fit for a study: the audience filters, LinkedIn-only studies, and
+ * devices (a study that only works on a computer needs someone who has one).
+ */
+export function fitsStudy(plan: any, participant: any, now = new Date()): { ok: boolean; reason?: string } {
+  const fit = profileMatches(plan?.audience, participant, now);
+  if (!fit.ok) return fit;
+  if (plan?.audience?.linkedinOnly && !participant?.linkedin?.connectedAt) {
+    return { ok: false, reason: 'This study is only open to people who’ve connected LinkedIn. You can connect it in your profile.' };
+  }
+  const devices: string[] = plan?.setup?.devices || [];
+  const has: string[] = participant?.profile?.devices || [];
+  if (devices.length && has.length && !devices.includes('phone') && !devices.includes('tablet') && !has.includes('computer')) {
+    return { ok: false, reason: 'This study needs a computer or laptop.' };
+  }
+  return { ok: true };
+}
+
 /** Which quota group a participant falls in, if any. */
 export function quotaGroupOf(audience: any, participant: any): string | null {
   const q = audience?.quota;
   if (!q) return null;
   const p = participant?.profile || {};
   if (q.by === 'gender') {
-    const g = GENDER_OF[norm(p.gender)] ?? norm(p.gender);
-    return q.groups.find((x: any) => norm(x.value) === g)?.value ?? null;
+    const g = toSex(p.gender);
+    return q.groups.find((x: any) => toSex(x.value) === g)?.value ?? null;
   }
   const speaks = new Set([...listOf(p.firstLanguage), ...listOf(p.fluentLanguage)]);
   return q.groups.find((x: any) => speaks.has(norm(x.value)))?.value ?? null;

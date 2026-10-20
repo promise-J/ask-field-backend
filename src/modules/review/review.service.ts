@@ -10,6 +10,7 @@ import { ParticipantModel } from '../user/models/participant.model';
 import { ResearcherModel } from '../user/models/researcher.model';
 import { BookingModel } from '../run/booking.model';
 import { markHappened, markNoShow } from '../run/booking.service';
+import { studyContact } from '../team/contact';
 
 /**
  * Stage 7: review the work. Quality checks on each submission, approve or reject (one or many, with a reason
@@ -30,7 +31,7 @@ export const REASONS = {
   other: { label: 'Something else', seen: 'see the researcher’s note' },
 } as const;
 export type Reason = keyof typeof REASONS;
-export type Flag = 'fast' | 'no-link' | 'rejected-before';
+export type Flag = 'fast' | 'no-link' | 'rejected-before' | 'late' | 'over';
 
 const titleOf = (s: any) => s?.plan?.basics?.title || s?.surveyName || 'your study';
 const methodOf = (s: any) => s?.method || 'survey';
@@ -64,6 +65,9 @@ export function flagsFor(a: any, s: any, repeat: Set<string>): Flag[] {
   if (minutes && a.timeSpent && a.timeSpent < (minutes * 60) / 3) out.push('fast');
   if (LINK_METHODS.includes(methodOf(s)) && s.returnCode && a.finishedBy === 'self') out.push('no-link');
   if (repeat.has(String(a.participantId))) out.push('rejected-before');
+  // Participant Stage 4: finished after their time ran out; 'over' means every place you paid for was already taken.
+  if (a.late === 'over') out.push('over');
+  else if (a.late === 'counted') out.push('late');
   return out;
 }
 
@@ -84,6 +88,10 @@ export async function reviewView(userId: string, id: string) {
     flags: a.status === 'submitted' ? flagsFor(a, s, repeat) : [],
     finishedBy: a.finishedBy || null,
     review: a.review?.by ? { by: a.review.by, reason: a.review.reason || null, note: a.review.note || '' } : null,
+    // Participant Stage 5: their question about a "not approved" decision, and the answer.
+    question: a.appeal?.status
+      ? { status: a.appeal.status, why: a.appeal.why, message: a.appeal.message || '', askedAt: a.appeal.askedAt, answerBy: new Date(new Date(a.appeal.askedAt).getTime() + 7 * DAY), answer: a.appeal.answer || '' }
+      : null,
   }));
   const waiting = items.filter((i) => i.status === 'submitted');
   return {
@@ -100,6 +108,7 @@ export async function reviewView(userId: string, id: string) {
       toReview: waiting.length,
       flagged: waiting.filter((i) => i.flags.length).length,
       approved: items.filter((i) => i.status === 'approved').length,
+      questions: items.filter((i) => i.question?.status === 'open').length,
       rejected: items.filter((i) => i.status === 'rejected').length,
     },
     soonest: waiting[0]?.autoApproveAt || null,
@@ -119,7 +128,7 @@ async function tellParticipant(a: any, s: any, decision: 'approved' | 'rejected'
   await sendMail({
     to: p.email,
     subject: `Not approved: ${titleOf(s)}`,
-    text: `Your response to "${titleOf(s)}" wasn't approved: ${why}.${note ? `\n\nThe researcher's note: ${note}` : ''}\n\nIf you think this is a mistake, reply to the researcher on joinStudy: ${appUrl(`/dashboard/participant/messages?study=${s._id}`)}`,
+    text: `Your response to "${titleOf(s)}" wasn't approved: ${why}.${note ? `\n\nThe researcher's note: ${note}` : ''}\n\nIf you think this is a mistake, you can ask about it within 14 days. The researcher can change their decision: ${appUrl(`/dashboard/participant/my-studies/${s._id}`)}`,
   });
 }
 
@@ -166,10 +175,12 @@ export async function saveAttendance(userId: string, id: string, input: { joined
 /** Everything waiting for this researcher, by study, oldest first (that's what gets approved first). */
 export async function toReview(userId: string) {
   const [waiting, unmarked]: any[][] = await Promise.all([
-    SurveyActionModel.find({ researcherId: userId, status: 'submitted' }).select('surveyId submittedAt timeSpent finishedBy participantId'),
+    SurveyActionModel.find({ researcherId: userId, status: 'submitted' }).select('surveyId submittedAt timeSpent finishedBy participantId late'),
     BookingModel.find({ researcherId: userId, status: 'booked', end: { $lte: new Date() } }).select('surveyId start end'),
   ]);
-  const ids = [...new Set([...waiting, ...unmarked].map((x) => String(x.surveyId)))];
+  // Participant Stage 5: open questions about decisions also need the researcher.
+  const asked: any[] = await SurveyActionModel.find({ researcherId: userId, 'appeal.status': 'open' }).select('surveyId appeal.askedAt');
+  const ids = [...new Set([...waiting, ...unmarked, ...asked].map((x) => String(x.surveyId)))];
   const studies: any[] = await SurveyModel.find({ _id: { $in: ids }, userId });
   const rows = [];
   for (const s of studies) {
@@ -186,6 +197,7 @@ export async function toReview(userId: string) {
       count: mine.length,
       flagged: mine.filter((a) => flagsFor(a, s, repeat).length).length,
       toMark: sessions.size,
+      questions: asked.filter((a) => String(a.surveyId) === String(s._id)).length,
       autoApproveAt: due.length ? new Date(Math.min(...due.map((d) => d.getTime()))) : null,
     });
   }
@@ -217,18 +229,25 @@ export async function autoApproveDue(now = new Date()) {
 export async function sendReviewReminders(now = new Date()) {
   const old: any[] = await SurveyActionModel.find({ status: 'submitted', submittedAt: { $lte: new Date(now.getTime() - REMIND_AFTER_DAYS * DAY) }, reviewReminded: { $exists: false } });
   const unmarked: any[] = await BookingModel.find({ status: 'booked', end: { $lte: new Date(now.getTime() - DAY) }, attendanceReminded: { $exists: false } });
+  // One email per person: each study's reminder goes to whoever made it (Stage 9), unless they turned it off.
+  const studies: any[] = await SurveyModel.find({ _id: { $in: [...old, ...unmarked].map((x) => x.surveyId) } }).select('plan.basics.title surveyName userId createdBy');
+  const names = new Map(studies.map((s: any) => [String(s._id), titleOf(s)]));
+  const contactOf = new Map<string, string | null>();
+  for (const s of studies) contactOf.set(String(s._id), await studyContact(s, 'review'));
   const byResearcher = new Map<string, { reviews: Map<string, number>; sessions: Set<string> }>();
-  const slot = (r: string) => byResearcher.get(r) || byResearcher.set(r, { reviews: new Map(), sessions: new Set() }).get(r)!;
-  for (const a of old) { const x = slot(String(a.researcherId)); x.reviews.set(String(a.surveyId), (x.reviews.get(String(a.surveyId)) || 0) + 1); }
-  for (const b of unmarked) slot(String(b.researcherId)).sessions.add(String(b.surveyId));
-  const names = new Map((await SurveyModel.find({ _id: { $in: [...old, ...unmarked].map((x) => x.surveyId) } }).select('plan.basics.title surveyName')).map((s: any) => [String(s._id), titleOf(s)]));
-  for (const [researcherId, x] of byResearcher) {
-    const r: any = await ResearcherModel.findById(researcherId).select('email');
+  const slot = (sid: string) => {
+    const to = contactOf.get(sid);
+    if (!to) return null;
+    return byResearcher.get(to) || byResearcher.set(to, { reviews: new Map(), sessions: new Set() }).get(to)!;
+  };
+  for (const a of old) { const x = slot(String(a.surveyId)); x?.reviews.set(String(a.surveyId), (x.reviews.get(String(a.surveyId)) || 0) + 1); }
+  for (const b of unmarked) slot(String(b.surveyId))?.sessions.add(String(b.surveyId));
+  for (const [to, x] of byResearcher) {
     const lines = [
       ...[...x.reviews].map(([sid, n]) => `- ${names.get(sid)}: ${n} to review. They're approved automatically in 2 days, which pays them.`),
       ...[...x.sessions].map((sid) => `- ${names.get(sid)}: mark who joined. Unmarked bookings count as attended after ${AUTO_APPROVE_DAYS} days.`),
     ];
-    await sendMail({ to: r?.email, subject: 'Work waiting for your review', text: `${lines.join('\n')}\n\nReview it here: ${appUrl('/dashboard/researcher/survey-actions')}` });
+    await sendMail({ to, subject: 'Work waiting for your review', text: `${lines.join('\n')}\n\nReview it here: ${appUrl('/dashboard/researcher/survey-actions')}` });
   }
   if (old.length) await SurveyActionModel.updateMany({ _id: { $in: old.map((a) => a._id) } }, { $set: { reviewReminded: now } });
   if (unmarked.length) await BookingModel.updateMany({ _id: { $in: unmarked.map((b) => b._id) } }, { $set: { attendanceReminded: now } });

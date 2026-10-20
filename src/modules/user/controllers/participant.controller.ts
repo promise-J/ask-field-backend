@@ -5,6 +5,7 @@ import { makeAuthController } from './auth.controller';
 import { asyncHandler } from '../../../utils/asyncHandler';
 import { apiSuccessResponse } from '../../../utils/apiResponse';
 import AppError from '../../../error-helpers/appError';
+import { assertLegacyUnlocked } from '../services/profile.service';
 
 export const participantAuth = new AuthService(ParticipantModel, 'participant');
 export const participantController = makeAuthController(participantAuth);
@@ -48,6 +49,7 @@ export const completeProfile = asyncHandler(async (req: Request, res: Response) 
   const user = await ParticipantModel.findById(req.user!.id);
   if (!user) throw new AppError('Account not found.', 404);
 
+  assertLegacyUnlocked(user, { ...answers, ...(dob ? { dateOfBirth: dob } : {}) });
   const profile = { ...((user.profile as any)?.toObject?.() ?? user.profile ?? {}) };
   for (const [k, v] of Object.entries(answers)) profile[k] = typeof v === 'string' ? v.trim() : String(v);
   if (dob) profile.dateOfBirth = dob;

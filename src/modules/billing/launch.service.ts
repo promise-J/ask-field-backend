@@ -82,7 +82,7 @@ export async function launchView(userId: string, id: string) {
 type Receipt = { name: string; organization?: string; email: string; cc?: string; reference?: string; country: string };
 
 /** Starts paying for a study. Returns what the browser needs to finish a card payment, or the invoice. */
-export async function pay(userId: string, id: string, input: { method: 'card' | 'invoice'; useCredit?: boolean; receipt: Receipt; agree: boolean }) {
+export async function pay(userId: string, id: string, input: { method: 'card' | 'invoice'; useCredit?: boolean; receipt: Receipt; agree: boolean; paidBy?: string }) {
   const s = await owned(userId, id);
   if (s.status !== 'draft') throw new AppError('This study is already live.', 409, 'already_live');
   if (!['none', 'changes-needed', 'awaiting-payment'].includes(s.launchStage || 'none')) throw new AppError('We’re already checking this study.', 409, 'in_review');
@@ -111,6 +111,7 @@ export async function pay(userId: string, id: string, input: { method: 'card' | 
     currency: view.figures.currency,
     breakdown: { places: view.figures.places, perPerson: view.figures.perPerson, pay: view.figures.pay, feeRate: view.figures.feeRate, fee: view.figures.fee, total: view.figures.total },
     receipt: { ...input.receipt, email: input.receipt.email || owner.email },
+    paidBy: input.paidBy || userId,
   });
 
   if (rest === 0) {
@@ -255,8 +256,8 @@ async function forReview(surveyId: string) {
   if (!isValidObjectId(surveyId)) throw new AppError('Study not found.', 404);
   const s: any = await SurveyModel.findById(surveyId);
   if (!s) throw new AppError('Study not found.', 404);
-  const r: any = await ResearcherModel.findById(s.userId).select('email firstName');
-  return { s, r };
+  const r: any = await ResearcherModel.findById(s.createdBy || s.userId).select('email firstName closedAt');
+  return { s, r: r?.closedAt ? null : r };
 }
 
 export async function approve(surveyId: string) {
@@ -348,7 +349,7 @@ ${bank}<p><small>Unused money comes back when the study closes. Questions: hello
 }
 
 /** Stage 6: more places on a live study. Paid like a launch; the places are added once the money is in. */
-export async function addPlaces(userId: string, id: string, input: { extra?: number; session?: string; method: 'card' | 'invoice'; useCredit?: boolean; receipt?: Receipt }) {
+export async function addPlaces(userId: string, id: string, input: { extra?: number; session?: string; method: 'card' | 'invoice'; useCredit?: boolean; receipt?: Receipt; paidBy?: string }) {
   const s = await owned(userId, id);
   if (s.status !== 'published') throw new AppError('Only a live study can get more places.', 409);
   let extra = Math.floor(Number(input.extra) || 0);
@@ -374,6 +375,7 @@ export async function addPlaces(userId: string, id: string, input: { extra?: num
     purpose: 'add-places',
     extraPlaces: extra,
     extraSession: session,
+    paidBy: input.paidBy || userId,
     method: rest === 0 ? 'credit' : input.method,
     amount: rest,
     creditUsed: credit,

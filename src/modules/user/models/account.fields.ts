@@ -37,7 +37,17 @@ export const hideSecrets = (schema: Schema) => {
   schema.set('toJSON', {
     virtuals: true,
     transform: (_doc: unknown, ret: Record<string, unknown>) => {
-      for (const k of ['password', 'verificationToken', 'verificationTokenExpires', 'verificationSentAt', 'otp', 'otpExpires', 'otpAttempts', 'resetToken', 'resetTokenExpires', 'institutionCode', 'institutionCodeExpires', 'institutionCodeAttempts', 'institutionCodeSentAt', '__v', 'id']) delete ret[k];
+      for (const k of ['password', 'verificationToken', 'verificationTokenExpires', 'verificationSentAt', 'otp', 'otpExpires', 'otpAttempts', 'resetToken', 'resetTokenExpires', 'institutionCode', 'institutionCodeExpires', 'institutionCodeAttempts', 'institutionCodeSentAt', 'emailChangeToken', 'emailChangeExpires', '__v', 'id']) delete ret[k];
+      const v = ret.verification as Record<string, unknown> | undefined;
+      if (v) for (const k of ['phoneHash', 'pending', 'sends', 'selfieSession']) delete v[k];
+      const li = ret.linkedin as Record<string, unknown> | undefined;
+      if (li) delete li.sub;
+      delete ret.linkedinState;
+      // Participant Stage 6: account details live with the payout provider; never send a hash or lock to the browser.
+      delete ret.payoutDetails;
+      delete ret.payoutLock;
+      const po = ret.payout as Record<string, unknown> | undefined;
+      if (po) for (const k of ['accountHash', 'providerRef']) delete po[k];
       return ret;
     },
   });

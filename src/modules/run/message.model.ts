@@ -13,6 +13,8 @@ const messageSchema = new Schema(
     from: { type: String, enum: ['researcher', 'participant'], required: true },
     body: { type: String, required: true, maxlength: 4000 },
     broadcast: { type: Boolean, default: false },
+    // Participant Stage 5: a question about a decision, and the researcher's answer to it.
+    kind: { type: String, enum: ['appeal', 'appeal-answer'] },
     readAt: Date, // read by the other side
   },
   {

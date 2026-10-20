@@ -12,7 +12,9 @@ const fundingSchema = new Schema(
     // launch = the study's first payment (or a top-up before launch); add-places = more places on a live study (Stage 6).
     purpose: { type: String, enum: ['launch', 'add-places'], default: 'launch' },
     extraPlaces: Number,
-    extraSession: String, // focus groups: the new session these places are for (ISO time)
+    extraSession: String,
+    refunded: { type: Number, default: 0 },
+    paidBy: { type: Types.ObjectId, ref: 'Researcher' }, // Stage 9: who in the workspace paid // Stage 8: unused money sent back to this card // focus groups: the new session these places are for (ISO time)
     status: { type: String, enum: ['pending', 'paid', 'cancelled', 'refunded'], default: 'pending', index: true },
     amount: { type: Number, required: true, min: 0 }, // what is (or was) due from the researcher
     creditUsed: { type: Number, default: 0 },

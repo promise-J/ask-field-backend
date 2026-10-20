@@ -34,6 +34,21 @@ const researcherSchema = new Schema(
       verifiedAt: Date,
       note: String,
     },
+    // Stage 9: account settings
+    emailPrefs: {
+      bookings: { type: Boolean, default: true },
+      messages: { type: Boolean, default: true },
+      review: { type: Boolean, default: true },
+      finish: { type: Boolean, default: true },
+      news: { type: Boolean, default: false },
+    },
+    pendingEmail: { type: String, lowercase: true, trim: true },
+    emailChangeToken: { type: String, select: false },
+    emailChangeExpires: { type: Date, select: false },
+    passwordChangedAt: Date,
+    closedAt: Date,
+    // Stage 9: the workspace's receipt details, filled in whenever anyone in it pays.
+    billingDetails: { name: String, organization: String, email: String, cc: String, reference: String, country: String },
     institutionCode: { type: String, select: false },
     institutionCodeExpires: { type: Date, select: false },
     institutionCodeAttempts: { type: Number, default: 0, select: false },

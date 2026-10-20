@@ -1,14 +1,43 @@
 import { z } from 'zod';
+import { config } from '../../config/env';
 
 const email = z.string().trim().email('Enter a valid email address.');
 const name = (label: string) => z.string().trim().min(1, `${label} is required.`).max(80);
 
-export const registerParticipantSchema = z.object({
+/** Participant countries are a setting (PARTICIPANT_COUNTRIES); anywhere else joins the waitlist. */
+export const participantCountry = z.preprocess(
+  (v) => (typeof v === 'string' ? v.trim() : ''),
+  z.string().refine((c) => c.length > 0, 'Choose where you live.').refine((c) => !c || config.participantCountries.includes(c), 'We can only pay people in Nigeria, Ghana and Kenya for now. Join the waitlist for your country.')
+);
+
+/** One box covers age and terms (canvas 1.2). */
+const agree = z.any().refine((v) => v === true, "Tick the box to confirm you're 18 or older and agree to the terms.");
+
+/** Participant Stage 1: one sign-up screen (canvas 1.2). `agree` becomes the time they agreed. */
+export const registerParticipantSchema = z
+  .object({
+    email,
+    password: z.string().min(8, 'Password must be at least 8 characters.'),
+    firstName: name('First name'),
+    lastName: name('Last name'),
+    country: participantCountry,
+    agree,
+    receivesUpdates: z.boolean().optional(),
+    turnstileToken: z.string().max(4096).optional(),
+  })
+  .transform(({ agree: _a, turnstileToken: _t, ...rest }) => ({ ...rest, agreedTermsAt: new Date() }));
+
+/** Joining the waitlist from outside the participant countries (canvas 1.1). */
+export const participantWaitlistSchema = z.object({
   email,
-  password: z.string().min(6, 'Password must be at least 6 characters.'),
-  firstName: name('First name'),
-  lastName: name('Last name'),
-  receivesUpdates: z.boolean().optional(),
+  country: z.string().trim().min(2, 'Choose your country.').max(80),
+});
+
+/** Fixing a mistyped email before it's confirmed (canvas 1.3). The password proves it's their sign-up. */
+export const changeUnconfirmedEmailSchema = z.object({
+  email,
+  password: z.string().min(1, 'Enter your password.'),
+  newEmail: email,
 });
 
 const METHODS = ['survey', 'interview', 'focus-group', 'product-test'] as const;
@@ -68,6 +97,9 @@ export const unifiedGoogleSchema = z.object({
   accountType: accountType.optional(),
   intent: accountType.optional(),
   method: z.enum(METHODS).optional(),
+  // A NEW participant account through Google needs the same country and agreement as the email form.
+  country: z.string().trim().max(80).optional(),
+  agree: z.boolean().optional(),
 });
 
 export const resendVerificationSchema = z.object({ email, accountType: accountType.optional() });

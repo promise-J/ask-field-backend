@@ -8,7 +8,7 @@ import jwt from 'jsonwebtoken';
 
 const api = request(app);
 const R = { email: 'ada@lab.example', password: 'research-pass-1', firstName: 'Ada', lastName: 'Obi', organizationName: 'Lab', signupPlatform: 'email' };
-const P = { email: 'tolu@example.com', password: 'secret12', firstName: 'Tolu', lastName: 'Ade', signupPlatform: 'email', receivesUpdates: true };
+const P = { email: 'tolu@example.com', password: 'secret12', firstName: 'Tolu', lastName: 'Ade', signupPlatform: 'email', receivesUpdates: true, country: 'Nigeria', agree: true };
 
 const linkFor = (email: string) => {
   const mail = [...outbox].reverse().find((m) => m.to === email && /verify/i.test(m.subject));
@@ -233,11 +233,14 @@ describe('studies end to end', () => {
   });
 
   it('pays out the available balance', async () => {
-    await api.post('/api/participants/payouts').set(P_AUTH()).send({}).expect(400);
-    await api.put('/api/participants/payout-details').set(P_AUTH()).send({ method: 'bank_transfer', bankName: 'Test Bank', accountName: 'Tolu Ade', accountNumber: '0123456789' }).expect(200);
-    await api.post('/api/participants/payouts').set(P_AUTH()).send({ amount: 5000 }).expect(400);
-    const p = await api.post('/api/participants/payouts').set(P_AUTH()).send({}).expect(201);
-    expect(p.body.data.payoutDetails.accountNumberLast4).toBe('6789');
+    // Participant Stage 6: a checked payout method, then a quote, then the cash-out.
+    await api.post('/api/participants/me/payouts/quote').set(P_AUTH()).send({}).expect(400);
+    await api.put('/api/participants/me/payout-method').set(P_AUTH()).send({ method: 'bank', institution: 'GTBank', account: '0123456789' }).expect(200);
+    await api.post('/api/participants/me/payouts/quote').set(P_AUTH()).send({ amount: 5000 }).expect(400);
+    const quote = await api.post('/api/participants/me/payouts/quote').set(P_AUTH()).send({}).expect(200);
+    const sent = await api.post('/api/participants/me/payouts').set(P_AUTH()).send({ quoteId: String(quote.body.data.quoteId) }).expect(201);
+    expect(sent.body.data.status).toBe('sending');
+    expect(sent.body.data.to.last4).toBe('6789');
     const e = await api.get('/api/participants/earnings').set(P_AUTH()).expect(200);
     expect(e.body.data).toMatchObject({ available: 0, processing: 1500 });
   });

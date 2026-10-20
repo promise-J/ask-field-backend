@@ -4,6 +4,7 @@ import { emails, sendMail } from '../../../utils/mailer';
 import { verifyFirebaseIdToken } from '../../../utils/firebase';
 import { UserType } from '../../../utils/jwt';
 import { AuthService } from './auth.service';
+import { config } from '../../../config/env';
 import { ParticipantModel } from '../models/participant.model';
 import { ResearcherModel } from '../models/researcher.model';
 
@@ -57,17 +58,29 @@ export async function login(email: string, password: string, accountType?: UserT
   return { needsChoice: true, choices: matched.map((m) => m.type) } as Choice;
 }
 
-export async function google(idToken: string, opts: { accountType?: UserType; intent?: UserType; method?: string }) {
+export async function google(idToken: string, opts: { accountType?: UserType; intent?: UserType; method?: string; country?: string; agree?: boolean }) {
   const profile = await verifyFirebaseIdToken(idToken);
   const existing = (await accountsFor(profile.email)).map((a) => a.type);
   const target = opts.accountType ?? (opts.intent && (existing.includes(opts.intent) || !existing.length || opts.intent === 'researcher') ? opts.intent : undefined);
   if (target) {
-    const extra = target === 'researcher' && opts.method ? { signupIntent: { method: opts.method, source: 'google' } } : {};
+    let extra: Record<string, unknown> = target === 'researcher' && opts.method ? { signupIntent: { method: opts.method, source: 'google' } } : {};
+    if (target === 'participant' && !existing.includes('participant')) extra = newParticipantExtras(opts);
     return services[target].googleAuthWithProfile(profile, extra);
   }
   if (existing.length === 1) return services[existing[0]].googleAuthWithProfile(profile);
   if (existing.length > 1) return { needsChoice: true, choices: existing } as Choice;
   throw new AppError('There is no joinStudy account for this Google email yet. Start a study or start earning to create one.', 404, 'no_account');
+}
+
+/**
+ * Participant Stage 1: a new participant account (email or Google) needs a country we pay out in
+ * and the 18+/terms agreement. Google sign-ups go through the same screen first (canvas 1.2).
+ */
+export function newParticipantExtras(opts: { country?: string; agree?: boolean }) {
+  if (!opts.country || !config.participantCountries.includes(opts.country) || opts.agree !== true) {
+    throw new AppError('Choose where you live and agree to the terms first.', 409, 'participant_signup_needed', { countries: config.participantCountries });
+  }
+  return { country: opts.country, agreedTermsAt: new Date() };
 }
 
 /** Resends the confirmation link for every unconfirmed account on this email. Silent otherwise. */

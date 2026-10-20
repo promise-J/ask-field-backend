@@ -2,10 +2,12 @@ import { isValidObjectId, Types } from 'mongoose';
 import AppError from '../../error-helpers/appError';
 import { env } from '../../config/env';
 import { sendMail } from '../../utils/mailer';
+import { wantsMessageEmails } from '../account/settings.service';
 import { SurveyActionModel, SurveyModel } from '../survey/survey.model';
 import { ParticipantModel } from '../user/models/participant.model';
 import { ResearcherModel } from '../user/models/researcher.model';
 import { MessageModel } from './message.model';
+import { studyContact } from '../team/contact';
 
 /**
  * Stage 6: messages between a researcher and the people taking part in one study.
@@ -43,12 +45,13 @@ async function notify(m: any, s: any) {
   const earlierUnread = await MessageModel.exists({ _id: { $ne: m._id }, surveyId: m.surveyId, participantId: m.participantId, from: m.from, readAt: { $exists: false } });
   if (earlierUnread) return;
   if (m.from === 'researcher') {
-    const p: any = await ParticipantModel.findById(m.participantId).select('email');
-    await sendMail({ to: p?.email, subject: `New message about "${titleOf(s)}"`, text: `${m.body}\n\nReply on joinStudy: ${appUrl(`/dashboard/participant/messages?study=${s._id}`)}` });
+    // Participant Stage 7: they can turn message emails off in Settings.
+    const to = await wantsMessageEmails(m.participantId);
+    if (to) await sendMail({ to, subject: `New message about "${titleOf(s)}"`, text: `${m.body}\n\nReply on joinStudy: ${appUrl(`/dashboard/participant/messages?study=${s._id}`)}` });
   } else {
-    const r: any = await ResearcherModel.findById(m.researcherId).select('email');
+    const to = await studyContact(s, 'messages');
     const a: any = await SurveyActionModel.findOne({ surveyId: s._id, participantId: m.participantId }).select('code');
-    await sendMail({ to: r?.email, subject: `${a?.code || 'A participant'} replied about "${titleOf(s)}"`, text: `${m.body}\n\nReply on joinStudy: ${appUrl(`/dashboard/researcher/studies/${s._id}?tab=messages&p=${m.participantId}`)}` });
+    await sendMail({ to: to as string, subject: `${a?.code || 'A participant'} replied about "${titleOf(s)}"`, text: `${m.body}\n\nReply on joinStudy: ${appUrl(`/dashboard/researcher/studies/${s._id}?tab=messages&p=${m.participantId}`)}` });
   }
 }
 

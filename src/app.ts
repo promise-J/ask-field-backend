@@ -20,8 +20,9 @@ app.use(
   cors({
     // In production only the listed sites can call the API. In development any origin works.
     origin: config.corsOrigins.length ? config.corsOrigins : env.NODE_ENV !== 'production',
-    allowedHeaders: ['Content-Type', 'Authorization', 'token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'token', 'X-Workspace'], // X-Workspace: Stage 9 team workspaces
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    exposedHeaders: ['Content-Disposition'], // Stage 8: the results CSV's file name
   })
 );
 

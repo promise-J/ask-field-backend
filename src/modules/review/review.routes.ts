@@ -5,6 +5,7 @@ import { apiSuccessResponse } from '../../utils/apiResponse';
 import { authMiddleware, requireRole } from '../../middlewares/auth.middleware';
 import { validate } from '../../middlewares/validate';
 import { decide, reviewView, saveAttendance, toReview } from './review.service';
+import { answer } from '../after/after.service';
 
 /** Stage 7: review the work. Mounted at the API root; every route checks auth itself. */
 
@@ -24,6 +25,9 @@ const ok = (fn: (req: Request) => Promise<unknown>, message = 'ok') => asyncHand
 router.get('/researchers/me/to-review', ...researcher, ok((r) => toReview(r.user!.id)));
 router.get('/surveys/:id/review', ...researcher, ok((r) => reviewView(r.user!.id, r.params.id)));
 router.post('/surveys/:id/review', ...researcher, validate(decideSchema), ok((r) => decide(r.user!.id, r.params.id, r.body), 'Saved.'));
+// Participant Stage 5: answer a question about a decision (approve it after all, or keep it with a reply).
+const answerSchema = z.object({ decision: z.enum(['approve', 'keep']), reply: z.string().trim().max(2000, 'Keep it under 2,000 characters.').optional() });
+router.post('/surveys/:id/review/:actionId/answer', ...researcher, validate(answerSchema), ok((r) => answer(r.user!.id, r.params.id, r.params.actionId, r.body), 'Answered.'));
 router.post('/surveys/:id/attendance', ...researcher, validate(attendanceSchema), ok((r) => saveAttendance(r.user!.id, r.params.id, r.body), 'Attendance saved.'));
 
 export default router;

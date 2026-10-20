@@ -22,7 +22,7 @@ const methodOf = (s: any) => s.method || (s.surveyType === 'aiTaskBuilder' ? 'ai
  * Stage 3: everything the researcher home needs in one call. Only real figures: no trends, no estimates.
  * Studies come from every project, so a study never "disappears" because it sits in a project.
  */
-export async function homeSummary(researcherId: string) {
+export async function homeSummary(researcherId: string, selfId?: string) {
   const me = await ResearcherModel.findById(researcherId);
   if (!me) throw new AppError('Account not found.', 404);
   const owner = new Types.ObjectId(researcherId);
@@ -71,6 +71,7 @@ export async function homeSummary(researcherId: string) {
       // Stage 5: where a draft is in launching (none, awaiting-payment, checking, changes-needed, rejected).
       stage: s.launchStage || 'none',
       funded: fundedBy.get(String(s._id)) || 0,
+      settled: !!s.settlement, // Stage 8: its unused money has gone back
       updatedAt: s.updatedAt,
     };
   });
@@ -93,7 +94,8 @@ export async function homeSummary(researcherId: string) {
   const v: any = me.get('institutionVerification') || {};
   const founding = foundingLead ? 'applied' : me.get('foundingLab.status') || 'none';
   return {
-    firstName: me.firstName,
+    // Stage 9: in someone else's workspace, greet the person signed in.
+    firstName: selfId && selfId !== researcherId ? (await ResearcherModel.findById(selfId).select('firstName'))?.firstName || me.firstName : me.firstName,
     account: {
       setupComplete: !!me.isCompleteProfile,
       organizationName: me.get('organizationName') || '',
@@ -113,8 +115,8 @@ export async function homeSummary(researcherId: string) {
     // Money held at launch and refunds arrive with funding in Stage 5. Until then only approved work is charged.
     money: {
       paid: round(studies.reduce((t, s) => t + s.spent, 0)),
-      // Paid in for studies that aren't closed, minus what's been paid out of them.
-      held: round(studies.filter((s) => s.status !== 'closed').reduce((t, s) => t + Math.max(0, s.funded - s.spent), 0)),
+      // Paid in for studies not yet settled (Stage 8), minus what's been paid out of them.
+      held: round(studies.filter((s) => !s.settled).reduce((t, s) => t + Math.max(0, s.funded - s.spent), 0)),
       credit,
       currency: env.DEFAULT_CURRENCY,
     },

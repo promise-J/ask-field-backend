@@ -1,3 +1,4 @@
+import { assertCanTakeStudies } from '../verification/gate';
 import { isValidObjectId, Types } from 'mongoose';
 import AppError from '../../error-helpers/appError';
 import { config } from '../../config/env';
@@ -22,8 +23,9 @@ import { SurveyActionModel, SurveyModel } from './survey.model';
 import { ageOn } from '../user/controllers/participant.controller';
 import { ledger } from '../wallet/wallet.service';
 import { feeRateFor } from '../user/services/setup.service';
-import { isOpenNow, missingByStep, profileMatches, quotaGroupOf, screenerPasses, STEPS } from './plan';
+import { isOpenNow, missingByStep, fitsStudy, profileMatches, quotaGroupOf, screenerPasses, STEPS } from './plan';
 import { participantView, surveyByReturnCode } from './plan.service';
+import { countTaken, holdMinutes, holdsPlaces } from './holds';
 
 const notFound = () => new AppError('Study not found.', 404);
 const DONE = ['submitted', 'approved'];
@@ -57,6 +59,16 @@ const METHOD_NAMES: Record<string, string> = {
   'ai-evaluation': 'AI evaluation',
 };
 
+/** In progress, but their time ran out (the sweep may not have caught it yet). */
+export const isExpired = (a: any, now = new Date()) => a?.status === 'in-progress' && !!a.heldUntil && new Date(a.heldUntil) <= now;
+
+export function outcomeOf(a: any): 'paid' | 'review' | 'late' | 'late-over' {
+  if (a.status === 'approved') return 'paid';
+  if (a.late === 'over') return 'late-over';
+  if (a.late === 'counted') return 'late';
+  return 'review';
+}
+
 export function placesFor(survey: any) {
   return Number(survey.numberOfParticipants || survey.totalSubmission || 0);
 }
@@ -73,7 +85,7 @@ export class SurveyService {
    * Stage 3: starts a draft straight from the dashboard, without asking for a project first.
    * Drafts go into the researcher's "My studies" project, made on first use. Estimate figures, if given, prefill the draft.
    */
-  async start(userId: string, input: { method: string; surveyName?: string; projectId?: string; estimate?: { participants: number; minutes: number; ratePerHour: number } }) {
+  async start(userId: string, input: { method: string; surveyName?: string; projectId?: string; estimate?: { participants: number; minutes: number; ratePerHour: number } }, createdBy?: string) {
     const chosen = input.projectId ? await ProjectModel.findOne({ _id: input.projectId, userId }) : null;
     if (input.projectId && !chosen) throw new AppError('Project not found.', 404);
     const project =
@@ -97,6 +109,7 @@ export class SurveyService {
     return SurveyModel.create({
       plan,
       userId,
+      createdBy: createdBy || userId,
       projectId: project._id,
       method: input.method,
       surveyType: input.method === 'ai-evaluation' ? 'aiTaskBuilder' : 'external',
@@ -223,8 +236,13 @@ export class SurveyService {
     if (!participant) throw new AppError('Account not found.', 404);
     if (!survey || survey.status !== 'published' || !isOpenNow(survey)) throw new AppError('This study is no longer taking participants.', 403);
     if (!participant.isCompleteProfile) throw new AppError('Complete your profile first so we can match you to studies.', 403);
+    // Participant Stage 1: one verified person per account before any study (canvas 1.7–1.9).
+    const already = await SurveyActionModel.exists({ surveyId, participantId });
+    if (!already) assertCanTakeStudies(participant);
 
-    const existing = await SurveyActionModel.findOne({ surveyId, participantId });
+    let existing: any = await SurveyActionModel.findOne({ surveyId, participantId });
+    // Participant Stage 4: someone who left, or whose time ran out, can start again while there's a place.
+    if (existing && (['left', 'timed-out'].includes(existing.status) || isExpired(existing))) existing = null;
     if (existing?.status === 'screened-out') throw new AppError('This study is looking for a different group of people. Keep an eye out for the next one.', 403, 'screened_out');
     if (existing?.status === 'no-show') throw new AppError('You missed your booking for this study, so it’s closed to you.', 403, 'no_show');
     if (existing && existing.status !== 'in-progress') throw new AppError('You have already taken part in this study.', 403);
@@ -248,10 +266,7 @@ export class SurveyService {
       }
     }
 
-    if (!existing) {
-      const filled = await SurveyActionModel.countDocuments({ surveyId, status: { $in: DONE } });
-      if (filled >= placesFor(survey)) throw new AppError('This study is full.', 403);
-    }
+    if (!existing) await this.assertPlaceFree(survey);
 
     return existing ?? (await this.startAction(participantId, survey));
   }
@@ -260,7 +275,7 @@ export class SurveyService {
   private async checkPlanned(participantId: string, survey: any, participant: any, existing: any, opts: { answers?: number[] }) {
     if (existing) return existing;
     const audience = survey.plan.audience;
-    const fit = profileMatches(audience, participant);
+    const fit = fitsStudy(survey.plan, participant);
     if (!fit.ok) throw new AppError(fit.reason!, 403, 'not_eligible');
 
     const questions: any[] = audience.questions || [];
@@ -285,11 +300,15 @@ export class SurveyService {
     if (audience.quota) {
       const g = audience.quota.groups.find((x: any) => x.value === group);
       if (!g) throw new AppError('This study is looking for a different group of people. Keep an eye out for the next one.', 403, 'not_eligible');
-      const taken = await SurveyActionModel.countDocuments({ surveyId: survey._id, quotaGroup: group, status: { $in: [...DONE, 'in-progress'] } });
+      const now = new Date();
+      const taken = await SurveyActionModel.countDocuments({
+        surveyId: survey._id,
+        quotaGroup: group,
+        $or: [{ status: { $in: DONE } }, { status: 'in-progress', $or: [{ heldUntil: { $gt: now } }, { heldUntil: null }] }],
+      });
       if (taken >= g.places) throw new AppError('This study already has enough people like you. Keep an eye out for the next one.', 403, 'quota_full');
     }
-    const filled = await SurveyActionModel.countDocuments({ surveyId: survey._id, status: { $in: DONE } });
-    if (filled >= placesFor(survey)) throw new AppError('This study is full.', 403);
+    await this.assertPlaceFree(survey);
     const action = await this.startAction(participantId, survey);
     if (action && (opts.answers || group)) {
       action.set({ screenerAnswers: opts.answers, quotaGroup: group || undefined });
@@ -304,7 +323,18 @@ export class SurveyService {
     return this.submit(participantId, String(survey._id), 'link');
   }
 
+  /** Participant Stage 4: places count finishers and people still within their time, so studies can't overfill. */
+  private async assertPlaceFree(survey: any) {
+    const taken = holdsPlaces(survey) ? await countTaken(survey._id) : await SurveyActionModel.countDocuments({ surveyId: survey._id, status: { $in: DONE } });
+    if (taken >= placesFor(survey)) {
+      throw new AppError('This study is full right now: all places are taken. If someone leaves or runs out of time, a place opens up again.', 403, 'full');
+    }
+  }
+
   private async startAction(participantId: string, survey: any) {
+    const now = new Date();
+    const minutes = Number(survey.surveyDuration) || Number(survey.plan?.setup?.minutes) || 0;
+    const heldUntil = holdsPlaces(survey) ? new Date(now.getTime() + holdMinutes(minutes) * 60000) : undefined;
     try {
       const n = await SurveyActionModel.countDocuments({ surveyId: survey._id });
       return await SurveyActionModel.create({
@@ -314,10 +344,18 @@ export class SurveyService {
         code: `P-${String(n + 1).padStart(2, '0')}`,
         amount: survey.surveyAmount,
         currency: survey.currency,
+        startedAt: now,
+        heldUntil,
       });
     } catch (err: any) {
-      if (err?.code === 11000) return SurveyActionModel.findOne({ surveyId: survey._id, participantId });
-      throw err;
+      if (err?.code !== 11000) throw err;
+      const prev: any = await SurveyActionModel.findOne({ surveyId: survey._id, participantId });
+      // Starting again after leaving or running out of time: a fresh hold on the same attempt (same P-code).
+      if (prev && (['left', 'timed-out'].includes(prev.status) || isExpired(prev))) {
+        prev.set({ status: 'in-progress', startedAt: now, heldUntil, endedAt: undefined, leftReason: undefined, codeTries: 0, codeLockedUntil: undefined });
+        await prev.save();
+      }
+      return prev;
     }
   }
 
@@ -329,31 +367,83 @@ export class SurveyService {
    * Called from /complete-survey after the survey tool redirects back. Accepts a survey id or a survey action id.
    * Marks the attempt submitted and records a pending earning.
    */
-  async submit(participantId: string, id: string, finishedBy: 'link' | 'self' | 'booking' = 'self') {
+  async submit(participantId: string, id: string, finishedBy: 'link' | 'code' | 'self' | 'booking' = 'self') {
     if (!isValidObjectId(id)) throw new AppError('We could not find this study attempt.', 404);
-    const action =
+    const action: any =
       (await SurveyActionModel.findOne({ _id: id, participantId })) ??
       (await SurveyActionModel.findOne({ surveyId: id, participantId }));
-    if (!action) throw new AppError('We could not find this study attempt. Start the study from your dashboard.', 404);
-    if (action.status !== 'in-progress') return { action, message: 'Your response is already with the researcher for review.' };
+    if (!action) throw new AppError('We could not find this study attempt. Start the study from your dashboard.', 404, 'not_started');
+    const late = action.status === 'timed-out' || action.status === 'left' || isExpired(action);
+    if (action.status !== 'in-progress' && !late) return { action, message: 'Your response is already with the researcher for review.', outcome: outcomeOf(action) };
     // A study closed early still accepts people who were mid-way, for 2 hours (Stage 6).
-    const study: any = await SurveyModel.findById(action.surveyId).select('status closedAt plan.pay.review');
+    const study: any = await SurveyModel.findById(action.surveyId).select('status closedAt plan.pay.review plan.setup.minutes surveyDuration returnCode method surveyType numberOfParticipants totalSubmission');
     if (study?.status === 'closed' && (!study.closedAt || Date.now() - new Date(study.closedAt).getTime() > 2 * 3600e3)) {
       throw new AppError('This study has closed, so new responses can’t be counted. Sorry.', 409, 'study_closed');
     }
+    // Participant Stage 4: with a finish link, "I've finished" alone isn't enough: come back through the link or type its code.
+    if (finishedBy === 'self' && study?.returnCode && holdsPlaces(study)) {
+      throw new AppError('Finish through the survey’s last page, or type the finish code it shows.', 409, 'use_code');
+    }
 
+    const now = new Date();
+    let lateMark: 'counted' | 'over' | undefined;
+    if (late) {
+      const others = await countTaken(action.surveyId, now, { _id: { $ne: action._id } });
+      lateMark = others < placesFor(study) ? 'counted' : 'over';
+    }
     action.status = 'submitted';
-    action.submittedAt = new Date();
-    action.timeSpent = Math.round((action.submittedAt.getTime() - new Date(action.startedAt).getTime()) / 1000);
-    action.set('finishedBy', finishedBy);
+    action.submittedAt = now;
+    action.timeSpent = Math.round((now.getTime() - new Date(action.startedAt).getTime()) / 1000);
+    action.set({ finishedBy, late: lateMark, heldUntil: undefined });
     await action.save();
     await ledger.pendingEarning(action);
-    // Stage 7: "Approve automatically" in the plan pays straight away (bookings are approved when marked).
-    if (study?.plan?.pay?.review === 'auto' && finishedBy !== 'booking') {
+    // Stage 7: "Approve automatically" pays straight away, unless it was very fast or late (those wait for the researcher).
+    const minutes = Number(study?.surveyDuration) || Number(study?.plan?.setup?.minutes) || 0;
+    const fast = minutes > 0 && action.timeSpent < (minutes * 60) / 3;
+    if (study?.plan?.pay?.review === 'auto' && finishedBy !== 'booking' && !fast && !lateMark) {
       await this.review(String(action.researcherId), String(action._id), 'approved', { by: 'auto' });
-      return { action: await SurveyActionModel.findById(action._id), message: 'Done. Your payment is in your balance.' };
+      return { action: await SurveyActionModel.findById(action._id), message: 'Done. Your payment is in your balance.', outcome: 'paid' as const };
     }
-    return { action, message: 'Submitted. The researcher will review your response, then your payment moves to your balance.' };
+    if (lateMark === 'over') {
+      return { action, message: 'Your answers reached the researcher, but every place had gone by then. They can still choose to pay you.', outcome: 'late-over' as const };
+    }
+    return {
+      action,
+      message: lateMark ? 'You finished after your time ran out, but a place was free, so it counts.' : 'Submitted. The researcher will review your response, then your payment moves to your balance.',
+      outcome: lateMark ? ('late' as const) : ('review' as const),
+    };
+  }
+
+  /** Canvas 4.2: typing the finish code from the survey's last page. Five wrong tries lock it for an hour. */
+  async finishWithCode(participantId: string, surveyId: string, code: string) {
+    if (!isValidObjectId(surveyId)) throw notFound();
+    const action: any = await SurveyActionModel.findOne({ surveyId, participantId });
+    if (!action) throw new AppError('Start the study first. The code only works for people taking part.', 409, 'not_started');
+    if (action.codeLockedUntil && action.codeLockedUntil > new Date()) {
+      const mins = Math.ceil((action.codeLockedUntil.getTime() - Date.now()) / 60000);
+      throw new AppError(`Too many wrong codes. Try again in ${mins} minute${mins === 1 ? '' : 's'}, or message the researcher.`, 429, 'code_locked');
+    }
+    const study: any = await SurveyModel.findById(surveyId).select('returnCode');
+    const clean = (x: string) => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!study?.returnCode || clean(code) !== clean(study.returnCode)) {
+      const tries = (action.codeTries || 0) + 1;
+      const locked = tries >= 5;
+      await SurveyActionModel.updateOne({ _id: action._id }, { $set: { codeTries: locked ? 0 : tries, ...(locked ? { codeLockedUntil: new Date(Date.now() + 3600e3) } : {}) } });
+      if (locked) throw new AppError('Too many wrong codes. Try again in an hour, or message the researcher.', 429, 'code_locked');
+      const left = 5 - tries;
+      throw new AppError(`That isn’t this study’s code. Check the last page of the survey: it’s 6 letters and numbers, like 7KQ2-XM. ${left} ${left === 1 ? 'try' : 'tries'} left.`, 400, 'wrong_code', { triesLeft: left });
+    }
+    return this.submit(participantId, String(action._id), 'code');
+  }
+
+  /** Canvas 4.4: leaving a study frees the place. Never counted against them, never paid. */
+  async leave(participantId: string, surveyId: string, reason?: string) {
+    if (!isValidObjectId(surveyId)) throw notFound();
+    const action: any = await SurveyActionModel.findOne({ surveyId, participantId });
+    if (!action || !['in-progress', 'timed-out'].includes(action.status)) throw new AppError('You’re not taking part in this study right now.', 409, 'not_started');
+    action.set({ status: 'left', endedAt: new Date(), leftReason: reason || undefined, heldUntil: undefined });
+    await action.save();
+    return action;
   }
 
   // ---------- researcher review ----------

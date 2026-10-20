@@ -49,7 +49,7 @@ router.post('/surveys/:id/live/resume', ...researcher, ok((r) => live.setPaused(
 router.post('/surveys/:id/live/close-date', ...researcher, validate(closeDateSchema), ok((r) => live.setCloseDate(uid(r), r.params.id, r.body.date), 'Close date saved.'));
 router.post('/surveys/:id/live/close', ...researcher, ok((r) => live.closeEarly(uid(r), r.params.id), 'Closed.'));
 router.post('/surveys/:id/live/add-times', ...researcher, validate(addTimesSchema), ok((r) => live.addTimes(uid(r), r.params.id, r.body), 'Times added.'));
-router.post('/surveys/:id/live/add-places', ...researcher, validate(addPlacesSchema), ok((r) => addPlaces(uid(r), r.params.id, r.body), 'ok', 201));
+router.post('/surveys/:id/live/add-places', ...researcher, validate(addPlacesSchema), ok((r) => addPlaces(uid(r), r.params.id, { ...r.body, paidBy: r.user!.selfId }), 'ok', 201));
 
 // Researcher: bookings
 router.get('/surveys/:id/bookings', ...researcher, ok((r) => booking.bookingsForResearcher(uid(r), r.params.id)));

@@ -45,7 +45,7 @@ router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async
 
 router.get('/refresh-token', asyncHandler(async (req: Request, res: Response) => {
   const header = req.headers.token;
-  apiSuccessResponse(res, 'Session refreshed.', refreshAccessToken(Array.isArray(header) ? header[0] : header));
+  apiSuccessResponse(res, 'Session refreshed.', await refreshAccessToken(Array.isArray(header) ? header[0] : header));
 }));
 
 export default router;

@@ -52,7 +52,12 @@ async function take(p: P, id: string, minutesAgo: number, via: 'link' | 'self' =
   await api.get(`/api/surveys/check-eligibility/${id}`).set(p).expect(200);
   await SurveyActionModel.updateOne({ surveyId: id, participantId: p.id }, { $set: { startedAt: new Date(Date.now() - minutesAgo * 60000) } });
   if (via === 'link') await api.post(`/api/surveys/done/${(await SurveyModel.findById(id))!.get('returnCode')}`).set(p).expect(200);
-  else await api.get(`/api/surveys/verify-survey-action/${id}`).set(p).expect(200);
+  else {
+    // Participant Stage 4: "I've finished" alone is refused on studies with a finish link; older studies still allow it.
+    await api.get(`/api/surveys/verify-survey-action/${id}`).set(p).expect(409);
+    await api.post(`/api/surveys/done/${(await SurveyModel.findById(id))!.get('returnCode')}`).set(p).expect(200);
+    await SurveyActionModel.updateOne({ surveyId: id, participantId: p.id }, { $set: { finishedBy: 'self' } });
+  }
   return String((await SurveyActionModel.findOne({ surveyId: id, participantId: p.id }))!._id);
 }
 

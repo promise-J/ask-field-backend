@@ -76,9 +76,10 @@ describe('planner', () => {
   });
 
   it('"Save and continue" refuses an unfinished step and says which fields', async () => {
-    const r = await put(auth, id, 'audience', { countries: ['Ghana'], minAge: 40, maxAge: 30 }, true).expect(400);
+    // Participant Stage 2 opened Ghana and Kenya; anywhere else is still refused.
+    const r = await put(auth, id, 'audience', { countries: ['Togo'], minAge: 40, maxAge: 30 }, true).expect(400);
     expect(r.body.code).toBe('step_incomplete');
-    expect(r.body.data.fields).toMatchObject({ countries: 'We can only recruit in Nigeria right now.' });
+    expect(r.body.data.fields).toMatchObject({ countries: 'We can recruit in Nigeria, Ghana, Kenya right now.' });
     const q = await put(auth, id, 'audience', { questions: [{ text: 'Q?', answers: [{ text: 'A', qualifies: true }, { text: 'B', qualifies: true }] }] }, true).expect(400);
     expect(q.body.data.fields.questions).toMatch(/screens nobody out/);
   });

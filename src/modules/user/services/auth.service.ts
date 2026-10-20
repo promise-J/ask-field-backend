@@ -42,7 +42,7 @@ export class AuthService {
   }
 
   private session(user: any) {
-    return { ...issueTokens({ id: String(user._id), userType: this.userType }), user: user.toJSON(), userType: this.userType };
+    return { ...issueTokens({ id: String(user._id), userType: this.userType, sid: randomToken(8) }), user: user.toJSON(), userType: this.userType };
   }
 
   async register(data: Record<string, any>) {
@@ -73,6 +73,27 @@ export class AuthService {
     }
     await this.sendVerification(user);
     return true;
+  }
+
+  /**
+   * Participant Stage 1 (canvas 1.3): fixes a mistyped email before it's confirmed, then sends the
+   * link to the new address. The password proves this is the person who signed up.
+   */
+  async changeUnconfirmedEmail(email: string, password: string, newEmail: string) {
+    const user = await this.findByEmail(email);
+    if (!user || !(await this.passwordMatches(user, password))) {
+      throw new AppError("That email and password don't match.", 401, 'wrong_credentials');
+    }
+    if (user.isVerified) throw new AppError('This email is already confirmed. Change it in Settings after you sign in.', 409, 'already_confirmed');
+    const next = normal(newEmail);
+    if (next === user.email) return user.toJSON();
+    if (await this.model.exists({ email: next })) {
+      throw new AppError('An account with this email already exists. Sign in instead.', 409, 'email_taken');
+    }
+    user.email = next;
+    user.verificationSentAt = null; // the new address gets its link straight away
+    await this.sendVerification(user);
+    return user.toJSON();
   }
 
   /**
@@ -118,7 +139,7 @@ export class AuthService {
     if (!user.isVerified && env.REQUIRE_EMAIL_VERIFICATION) {
       const last = user.verificationSentAt ? new Date(user.verificationSentAt).getTime() : 0;
       if (Date.now() - last > RESEND_GAP_SECONDS * 1000) await this.sendVerification(user);
-      throw new AppError("Confirm your email first. We've sent you a new link.", 403, 'email_not_confirmed', { email: user.email });
+      throw new AppError("Confirm your email first. We've sent you a new link.", 403, 'email_not_confirmed', { email: user.email, accountType: this.userType });
     }
     user.lastLoginAt = new Date();
     await user.save();
@@ -219,12 +240,26 @@ export class AuthService {
 }
 
 /** Issues a new access token from a refresh token. Works for both account types. */
-export function refreshAccessToken(refreshToken?: string) {
+export async function refreshAccessToken(refreshToken?: string) {
   if (!refreshToken) throw new AppError('Please sign in again.', 401, 'signed_out');
+  let p: any;
   try {
-    const p = verifyRefreshToken(refreshToken.replace(/^Bearer\s+/i, ''));
-    return issueTokens({ id: p.id, userType: p.userType });
+    p = verifyRefreshToken(refreshToken.replace(/^Bearer\s+/i, ''));
   } catch {
     throw new AppError('Your session has expired. Please sign in again.', 401, 'signed_out');
   }
+  // Stage 9: changing the password (or closing the account) signs out every other session.
+  if (p.userType === 'researcher') {
+    const { ResearcherModel } = await import('../models/researcher.model');
+    const r: any = await ResearcherModel.findById(p.id).select('passwordChangedAt closedAt');
+    if (!r || r.closedAt || (r.passwordChangedAt && (p.iat || 0) * 1000 < new Date(r.passwordChangedAt).getTime() - 1000)) {
+      throw new AppError('Please sign in again.', 401, 'signed_out');
+    }
+  }
+  // Participant Stage 7: closing, a password change, or "Sign out everywhere else".
+  if (p.userType === 'participant') {
+    const { sessionStillValid } = await import('../../account/settings.service');
+    if (!(await sessionStillValid(p.id, p.iat, p.sid, p.at))) throw new AppError('Please sign in again.', 401, 'signed_out');
+  }
+  return issueTokens({ id: p.id, userType: p.userType, sid: p.sid });
 }

@@ -47,6 +47,11 @@ const surveySchema = new Schema(
     currency: { type: String, default: () => env.DEFAULT_CURRENCY },
     publishedAt: Date,
     closedAt: Date,
+    // Stage 8: why it closed, where unused money goes, and what was settled.
+    createdBy: { type: Types.ObjectId, ref: 'Researcher' }, // Stage 9: who in the workspace made it; study emails go to them
+    closedReason: { type: String, enum: ['early', 'full', 'date'] },
+    returnTo: { type: String, enum: ['credit', 'card'], default: 'credit' },
+    settlement: Schema.Types.Mixed,
     // Stage 4 planner: { basics, audience, setup, pay }, each saved by its own step. See plan.ts.
     plan: { type: Schema.Types.Mixed, default: () => ({}) },
     // The return link at the end of a survey: https://joinstudy.io/done/<returnCode>
@@ -54,6 +59,10 @@ const surveySchema = new Schema(
     // Stage 5: between "draft" and "published". none → awaiting-payment (invoice) → checking → changes-needed / published, or rejected.
     // Stage 6: paused studies take no new participants; people mid-study can finish.
     paused: { type: Boolean, default: false },
+    // Participant Stage 7: paused by joinStudy after reports from several participants. Only joinStudy can lift it.
+    reportHold: { at: Date, reports: Number },
+    // Participant Stage 4: when we last told the researcher someone left because the link didn't work (once a day at most).
+    linkProblemAt: Date,
     launchStage: { type: String, enum: ['none', 'awaiting-payment', 'checking', 'changes-needed', 'rejected'], default: 'none', index: true },
     review: {
       checks: { type: [{ _id: false, key: String, label: String, ok: Boolean, note: String }], default: undefined },
@@ -72,7 +81,29 @@ const surveyActionSchema = new Schema(
     surveyId: { type: Types.ObjectId, ref: 'Survey', required: true, index: true },
     researcherId: { type: Types.ObjectId, ref: 'Researcher', required: true, index: true },
     participantId: { type: Types.ObjectId, ref: 'Participant', required: true, index: true },
-    status: { type: String, enum: ['in-progress', 'submitted', 'approved', 'rejected', 'screened-out', 'no-show'], default: 'in-progress', index: true },
+    status: { type: String, enum: ['in-progress', 'submitted', 'approved', 'rejected', 'screened-out', 'no-show', 'left', 'timed-out'], default: 'in-progress', index: true },
+    // Participant Stage 4: the place is held until this time (link-based studies). Then the status becomes timed-out.
+    heldUntil: Date,
+    // Participant Stage 4: when they left or their time ran out, and why they left (optional).
+    endedAt: Date,
+    leftReason: { type: String, enum: ['longer', 'link-broken', 'came-up', 'uncomfortable', 'other', 'account-closed'] },
+    // Finished after their time ran out (counted if a place was free; otherwise "over" the places paid for).
+    late: { type: String, enum: ['counted', 'over'] },
+    // Typing the finish code: wrong tries, and a lock after too many.
+    codeTries: { type: Number, default: 0 },
+    codeLockedUntil: Date,
+    // Participant Stage 5: one question about a "not approved" decision. open → approved | kept → escalated → upheld | overturned.
+    appeal: {
+      why: { type: String, enum: ['did-tasks', 'did-checks', 'eligible', 'other'] },
+      message: String,
+      askedAt: Date,
+      status: { type: String, enum: ['open', 'approved', 'kept', 'escalated', 'upheld', 'overturned'] },
+      answer: String,
+      answeredAt: Date,
+      escalatedAt: Date,
+      resolvedAt: Date,
+      resolution: String,
+    },
     // Stage 6: how the researcher sees this person, e.g. P-07 (numbered in the order they started).
     code: String,
     screenerAnswers: { type: [Number], default: undefined },
@@ -83,7 +114,7 @@ const surveyActionSchema = new Schema(
     reviewedAt: Date,
     timeSpent: Number, // seconds
     // Stage 7: how they said they'd finished ("link" = the study's finish link), and the decision on their work.
-    finishedBy: { type: String, enum: ['link', 'self', 'booking'] },
+    finishedBy: { type: String, enum: ['link', 'code', 'self', 'booking'] },
     review: {
       by: { type: String, enum: ['researcher', 'auto', 'attendance'] },
       reason: String, // rejections: tasks | attention | low-effort | not-eligible | other

@@ -122,7 +122,7 @@ describe('1.5 one sign-in for everyone', () => {
   });
 
   it('participant-only account when they came to run a study, and an easy way to add a researcher account', async () => {
-    await api.post('/api/participants/auth/register').send({ firstName: 'Tolu', lastName: 'Ade', email: 'tolu@example.com', password: PASS }).expect(201);
+    await api.post('/api/participants/auth/register').send({ firstName: 'Tolu', lastName: 'Ade', email: 'tolu@example.com', password: PASS, country: 'Nigeria', agree: true }).expect(201);
     await api.get('/api/participants/auth/verify-email').query({ email: 'tolu@example.com', token: new URL(lastMail('tolu@example.com', /verify/i)!.text.match(/https?:\/\/\S+/)![0]).searchParams.get('token') }).expect(200);
     const res = await api.post('/api/auth/login').send({ email: 'tolu@example.com', password: PASS, intent: 'researcher' }).expect(409);
     expect(res.body).toMatchObject({ code: 'participant_only', data: { accountType: 'participant' } });

@@ -1,6 +1,6 @@
 import Redis from 'ioredis';
 
-import {env, logger} from '.'
+import {env, logger} from './'
 
 let redis: Redis | null = null;
 
