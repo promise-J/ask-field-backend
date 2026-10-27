@@ -1,6 +1,7 @@
 import { Types, isValidObjectId } from 'mongoose';
 import AppError from '../../error-helpers/appError';
 import { config, env } from '../../config/env';
+import { formatMoney } from '../../utils/money';
 import logger from '../../config/logger';
 import { sendMail } from '../../utils/mailer';
 import { SurveyModel } from '../survey/survey.model';
@@ -9,7 +10,7 @@ import { TransactionModel } from '../wallet/transaction.model';
 import { planView } from '../survey/plan.service';
 import { hourly } from '../survey/plan';
 import { FundingModel } from './funding.model';
-import { createCardPayment, providerName, refundCard } from './provider';
+import { cardPaymentStatus, createCardPayment, providerName, refundCard } from './provider';
 
 /**
  * Stage 5: fund and launch. Researchers pay the full cost of a study up front (card or invoice);
@@ -50,8 +51,27 @@ async function nextNumber() {
   return `JS-${year}-${String(n).padStart(4, '0')}`;
 }
 
+/**
+ * Card payments are confirmed by Stripe's webhook. If it's missing or late (not set up, a missed call), this asks
+ * Stripe directly, so a researcher who paid isn't left waiting. Runs when the pay, status or study page opens.
+ * Errors are logged, never shown: the webhook can still confirm later.
+ */
+export async function syncCardPayments(surveyId: unknown) {
+  const pending: any[] = await FundingModel.find({ surveyId, status: 'pending', provider: 'stripe' }).select('providerRef');
+  for (const f of pending) {
+    try {
+      const r = await cardPaymentStatus(String(f.providerRef || ''));
+      if (r?.status === 'succeeded') await markPaid(String(f._id), { cardLast4: r.last4 });
+    } catch (err: any) {
+      console.error('[payments] Could not check a card payment with Stripe:', err?.message || err);
+    }
+  }
+}
+
 /** Everything the review, pay and status screens show. */
 export async function launchView(userId: string, id: string) {
+  const s0 = await owned(userId, id);
+  await syncCardPayments(s0._id);
   const s = await owned(userId, id);
   const view = await planView(userId, id);
   const [fundings, inSoFar, credit] = await Promise.all([
@@ -181,7 +201,7 @@ export async function autoChecks(s: any) {
   const link: string = s.surveyURL || '';
   const checks: { key: string; label: string; ok: boolean; note: string }[] = [];
   checks.push({ key: 'consent', label: 'Consent', ok: b.consent?.mode === 'own' || (b.consent?.text || '').length >= 20, note: b.consent?.mode === 'own' ? 'Collected in your study.' : 'On a joinStudy page.' });
-  checks.push({ key: 'pay', label: 'Fair pay', ok: config.minHourlyPay == null || rate >= config.minHourlyPay, note: `${rate.toFixed(2)} an hour.` });
+  checks.push({ key: 'pay', label: 'Fair pay', ok: config.minHourlyPay == null || rate >= config.minHourlyPay, note: `${formatMoney(rate, s.currency || env.DEFAULT_CURRENCY)} an hour${config.recommendedHourlyPay != null && rate < config.recommendedHourlyPay && (config.minHourlyPay == null || rate >= config.minHourlyPay) ? `, below the suggested ${formatMoney(config.recommendedHourlyPay, s.currency || env.DEFAULT_CURRENCY)}` : ''}.` });
   checks.push({ key: 'description', label: 'Description', ok: (b.description || '').trim().length >= 20, note: (b.description || '').trim().length >= 20 ? 'Explains what people will do.' : 'Too short to tell people what they’ll do.' });
   let opens = true;
   let note = 'Opens.';

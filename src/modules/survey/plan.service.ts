@@ -73,6 +73,7 @@ export async function planView(userId: string, id: string) {
     returnLink: s.returnCode ? returnLinkFor(s.returnCode) : null,
     figures: { places, minutes, perPerson, hourly: hourly(perPerson, minutes), feeRate, pay, fee, total: round(pay + fee), currency: s.currency || env.DEFAULT_CURRENCY },
     minHourlyPay: config.minHourlyPay,
+    recommendedHourlyPay: config.recommendedHourlyPay,
     organization: { name: me?.organizationName || '', verified: me?.institutionVerification?.status === 'verified' },
   };
 }
@@ -183,4 +184,25 @@ export async function recordConsentAndStartLink(participantId: string, surveyId:
   const url = new URL(s.surveyURL);
   if (s.plan?.setup?.passParticipantId !== false) url.searchParams.set('jsid', String(action._id));
   return { url: url.toString(), surveyActionId: String(action._id) };
+}
+
+/**
+ * Alpha feedback: delete a draft. Only studies that were never paid for: anything paid, in our check, live or
+ * closed stays (its records matter). A draft with an invoice waiting must have the invoice cancelled first; a card
+ * payment that was started but never finished is cancelled with it.
+ */
+export async function deleteDraft(userId: string, id: string) {
+  const s: any = await owned(userId, id);
+  if (s.status !== 'draft') throw new AppError('Only drafts can be deleted. To stop a live study, close it.', 409, 'not_a_draft');
+  const { FundingModel } = await import('../billing/funding.model');
+  const fundings: any[] = await FundingModel.find({ surveyId: s._id, status: { $in: ['paid', 'pending'] } }).select('status method');
+  if (fundings.some((f) => f.status === 'paid')) throw new AppError('This study has been paid for, so it can’t be deleted.', 409, 'paid');
+  if (fundings.some((f) => f.method === 'invoice')) throw new AppError('Cancel the invoice for this study first, then delete it.', 409, 'invoice_pending');
+  if (!['none', 'changes-needed', undefined, null].includes(s.launchStage)) {
+    throw new AppError('This study is with joinStudy for checking, so it can’t be deleted.', 409, 'in_review');
+  }
+  if (await SurveyActionModel.exists({ surveyId: s._id })) throw new AppError('People have already taken part, so it can’t be deleted.', 409, 'has_activity');
+  await FundingModel.updateMany({ surveyId: s._id, status: 'pending' }, { $set: { status: 'cancelled' } });
+  await SurveyModel.deleteOne({ _id: s._id, status: 'draft' });
+  return { deleted: String(s._id) };
 }

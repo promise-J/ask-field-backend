@@ -6,7 +6,7 @@ import { apiSuccessResponse } from '../../utils/apiResponse';
 import { authMiddleware, requireRole } from '../../middlewares/auth.middleware';
 import { FundingModel } from './funding.model';
 import { verifyStripeSignature } from './provider';
-import { fundingDocument, markPaid } from './launch.service';
+import { fundingDocument, markPaid, syncCardPayments } from './launch.service';
 
 /** Stripe calls this when a card payment succeeds. Mounted with a raw body (see app.ts). */
 export const stripeWebhook = asyncHandler(async (req: Request, res: Response) => {
@@ -17,7 +17,10 @@ export const stripeWebhook = asyncHandler(async (req: Request, res: Response) =>
   if (event.type === 'payment_intent.succeeded') {
     const pi = event.data.object;
     const f = await FundingModel.findOne({ providerRef: pi.id });
-    if (f) await markPaid(String(f._id), { cardLast4: pi.payment_method_details?.card?.last4 });
+    // The card's last 4 digits are on the charge, not the payment itself: ask Stripe for them (best effort).
+    if (f) await syncCardPayments(f.surveyId).catch(() => undefined);
+    const again: any = f && (await FundingModel.findById(f._id).select('status'));
+    if (f && again?.status === 'pending') await markPaid(String(f._id));
   }
   res.json({ received: true });
 });

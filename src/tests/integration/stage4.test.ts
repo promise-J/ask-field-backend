@@ -123,7 +123,7 @@ describe('planner', () => {
     const before = config.minHourlyPay;
     (config as any).minHourlyPay = 13;
     try {
-      expect(missingByStep('survey', SURVEY_PLAN).pay).toEqual(['Pay is below the minimum of 13 an hour.']);
+      expect(missingByStep('survey', SURVEY_PLAN).pay).toEqual(['Pay is below the minimum of ₦13.00 an hour.']);
     } finally {
       (config as any).minHourlyPay = before;
     }

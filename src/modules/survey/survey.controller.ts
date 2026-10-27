@@ -81,6 +81,10 @@ export const getPlan = asyncHandler(async (req: Request, res: Response) => {
   apiSuccessResponse(res, 'ok', await plan.planView(req.user!.id, req.params.id));
 });
 
+export const deleteDraft = asyncHandler(async (req: Request, res: Response) => {
+  apiSuccessResponse(res, 'Draft deleted.', await plan.deleteDraft(req.user!.id, req.params.id));
+});
+
 export const savePlanStep = asyncHandler(async (req: Request, res: Response) => {
   const { view, fields } = await plan.saveStep(req.user!.id, req.params.id, req.params.step as any, req.body.data || {}, !!req.body.final);
   apiSuccessResponse(res, 'Saved.', { ...view, fields });

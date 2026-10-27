@@ -25,6 +25,14 @@ async function owned(userId: string, id: string) {
 }
 
 export async function liveView(userId: string, id: string, now = new Date()) {
+  // A card payment for more places may be waiting for Stripe's webhook: check it directly (see syncCardPayments).
+  try {
+    const { syncCardPayments } = await import('../billing/launch.service');
+    const s0: any = await SurveyModel.findById(id).select('_id');
+    if (s0) await syncCardPayments(s0._id);
+  } catch {
+    /* the webhook still confirms it */
+  }
   const s = await owned(userId, id);
   const method = methodOf(s);
   const plan = s.plan || {};

@@ -1,6 +1,6 @@
 import { Model } from 'mongoose';
 import AppError from '../../../error-helpers/appError';
-import { env } from '../../../config/env';
+import { env, config } from '../../../config/env';
 import { comparePassword, hashPassword, matchesHash, randomOtp, randomToken, sha256 } from '../../../utils/hash';
 import { emails, sendMail } from '../../../utils/mailer';
 import { issueTokens, UserType, verifyRefreshToken } from '../../../utils/jwt';
@@ -247,6 +247,10 @@ export async function refreshAccessToken(refreshToken?: string) {
     p = verifyRefreshToken(refreshToken.replace(/^Bearer\s+/i, ''));
   } catch {
     throw new AppError('Your session has expired. Please sign in again.', 401, 'signed_out');
+  }
+  // Alpha feedback: renewing only works within the idle limit. This also ends long-lived tokens issued before it.
+  if (config.idleMinutes && (!p.iat || Date.now() / 1000 - p.iat > config.idleMinutes * 60)) {
+    throw new AppError('You were signed out after a while without activity. Please sign in again.', 401, 'signed_out_idle');
   }
   // Stage 9: changing the password (or closing the account) signs out every other session.
   if (p.userType === 'researcher') {

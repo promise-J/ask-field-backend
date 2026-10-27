@@ -17,7 +17,7 @@ const router = Router();
 
 // Public prices for the website and the study builder.
 router.get('/pricing', (_req, res) =>
-  res.json({ success: true, message: 'ok', data: { platformFeeRate: config.platformFeeRate, academicFeeRate: config.academicFeeRate, minPayoutAmount: config.minPayoutAmount, minHourlyPay: config.minHourlyPay, currency: env.DEFAULT_CURRENCY } })
+  res.json({ success: true, message: 'ok', data: { platformFeeRate: config.platformFeeRate, academicFeeRate: config.academicFeeRate, minPayoutAmount: config.minPayoutAmount, minHourlyPay: config.minHourlyPay, recommendedHourlyPay: config.recommendedHourlyPay, currency: env.DEFAULT_CURRENCY } })
 );
 // Participant Stage 2: the countries, places and languages participants can answer, for the researcher's "Who you need".
 router.get('/participant-options', (_req, res) =>

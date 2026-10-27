@@ -47,9 +47,9 @@ describe('3.1 home, first visit', () => {
     expect(h.money).toMatchObject({ paid: 0, held: 0, credit: 0 });
   });
 
-  it('pricing tells the estimate the fees and the (optional) minimum hourly pay', async () => {
+  it('pricing tells the estimate the fees and the hourly pay settings (none set for naira)', async () => {
     const res = await api.get('/api/pricing').expect(200);
-    expect(res.body.data).toMatchObject({ platformFeeRate: 0.2, academicFeeRate: 0.18, minHourlyPay: null });
+    expect(res.body.data).toMatchObject({ platformFeeRate: 0.2, academicFeeRate: 0.18, minHourlyPay: null, recommendedHourlyPay: null });
   });
 });
 

@@ -14,6 +14,7 @@ router.use(authMiddleware);
 router.post('/start', researcher, validate(startStudySchema), c.startStudy);
 // Stage 4 planner
 router.get('/:id/plan', researcher, c.getPlan);
+router.delete('/:id', researcher, c.deleteDraft); // alpha feedback: delete a draft
 router.get('/:id/plan/match', researcher, c.planMatchCount);
 router.put('/:id/plan/:step', researcher, validate(planStepSchema), c.savePlanStep);
 // Stage 5 launch

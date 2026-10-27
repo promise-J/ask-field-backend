@@ -15,15 +15,15 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().optional(),
   ACCESS_TOKEN_TTL: z.string().default('1h'),
   REFRESH_TOKEN_TTL: z.string().default('28d'),
-  REDIS_URL: z.string().optional(),
-
-  // Brevo
   BREVO_API_KEY: z.string(),
   APP_NAME: z.string(),
-
+  // Alpha feedback: sign people out after this many minutes without activity (both token lifetimes are capped at it,
+  // and renewing only works within it). 0 turns it off, so REFRESH_TOKEN_TTL applies again.
+  SESSION_IDLE_MINUTES: z.string().default('20'),
+  REDIS_URL: z.string().optional(),
 
   // Where the React app lives. Used to build links in emails.
-  FRONTEND_URL: z.string().default('https://joinstudy.io'),
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
   // Comma-separated list of allowed browser origins. Empty = allow all (development only).
   CORS_ORIGINS: z.string().optional(),
 
@@ -48,9 +48,13 @@ const envSchema = z.object({
   ACADEMIC_FEE_RATE: z.string().default('0.18'),
   // Extra academic email domains, comma-separated (e.g. carleton.ca,uottawa.ca). See utils/academic.ts.
   ACADEMIC_DOMAINS: z.string().optional(),
-  MIN_PAYOUT_AMOUNT: z.string().default('5000'),
-  // Lowest hourly pay the cost estimate suggests. Unset means no floor is shown (decision pending).
+  // Smallest cash-out, in DEFAULT_CURRENCY.
+  MIN_PAYOUT_AMOUNT: z.string().default('5'),
+  // Hourly pay, in DEFAULT_CURRENCY. Below MIN_HOURLY_PAY a study can't launch (0 = no floor).
+  // Below RECOMMENDED_HOURLY_PAY researchers see a "better pay fills faster" warning, and the estimate starts there.
+  // Unset, they default to 4 and 8 when DEFAULT_CURRENCY is USD (the amounts only make sense in dollars).
   MIN_HOURLY_PAY: z.string().optional(),
+  RECOMMENDED_HOURLY_PAY: z.string().optional(),
   // Stage 5 payments. With STRIPE_SECRET_KEY set, cards go through Stripe; without it (outside production) a test provider stands in.
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_PUBLISHABLE_KEY: z.string().optional(),
@@ -59,13 +63,11 @@ const envSchema = z.object({
   INVOICE_BANK_DETAILS: z.string().optional(),
   // Where "a study is waiting for review" emails go.
   REVIEW_INBOX: z.string().optional(),
-  DEFAULT_CURRENCY: z.string().default('USD'),
-  //end
-
   // Participant Stage 7: the Help contact form, and reports about studies (both default to LEADS_INBOX).
   SUPPORT_INBOX: z.string().optional(),
   TRUST_INBOX: z.string().optional(),
   // Participant Stage 3: studies are priced and paid in US dollars. Participants convert at cash-out (Stage 6).
+  DEFAULT_CURRENCY: z.string().default('USD'),
 
   // Participant Stage 1: where people can sign up to take studies, comma-separated. Anyone else joins a waitlist.
   PARTICIPANT_COUNTRIES: z.string().default('Nigeria,Ghana,Kenya'),
@@ -91,14 +93,22 @@ const envSchema = z.object({
 
 export const env = envSchema.parse(process.env);
 
+/** A pay setting: the set value (0 = none), or the US-dollar default when unset and the currency is USD. */
+export function hourlyPay(raw: string | undefined, currency: string, usdDefault: number) {
+  if (raw != null && raw.trim() !== '') return Number(raw) > 0 ? Number(raw) : null;
+  return currency.toUpperCase() === 'USD' ? usdDefault : null;
+}
+
 export const config = {
   refreshSecret: env.JWT_REFRESH_SECRET || `${env.JWT_SECRET}.refresh`,
   platformFeeRate: Number(env.PLATFORM_FEE_RATE),
   academicFeeRate: Number(env.ACADEMIC_FEE_RATE),
   extraAcademicDomains: (env.ACADEMIC_DOMAINS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
   minPayoutAmount: Number(env.MIN_PAYOUT_AMOUNT),
-  minHourlyPay: env.MIN_HOURLY_PAY ? Number(env.MIN_HOURLY_PAY) : null,
+  minHourlyPay: hourlyPay(env.MIN_HOURLY_PAY, env.DEFAULT_CURRENCY, 4),
+  recommendedHourlyPay: hourlyPay(env.RECOMMENDED_HOURLY_PAY, env.DEFAULT_CURRENCY, 8),
   corsOrigins: (env.CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean),
   participantCountries: env.PARTICIPANT_COUNTRIES.split(',').map((s) => s.trim()).filter(Boolean),
   phoneHashSecret: env.PHONE_HASH_SECRET || `${env.JWT_SECRET}.phone`,
+  idleMinutes: Math.max(0, Number(env.SESSION_IDLE_MINUTES) || 0),
 };

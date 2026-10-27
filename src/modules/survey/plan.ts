@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { config } from '../../config/env';
+import { config, env } from '../../config/env';
+import { formatMoney } from '../../utils/money';
 import { ALL_LANGUAGES, REGIONS } from '../user/profile.options';
 
 /**
@@ -203,7 +204,7 @@ export function missingByStep(method: Method, plan: any): Record<Step, string[]>
   const { minutes } = placesAndMinutes(method, plan);
   const rate = hourly(Number(plan?.pay?.perPerson) || 0, minutes);
   if (!out.pay.length && config.minHourlyPay != null && rate < config.minHourlyPay) {
-    out.pay.push(`Pay is below the minimum of ${config.minHourlyPay} an hour.`);
+    out.pay.push(`Pay is below the minimum of ${formatMoney(config.minHourlyPay, env.DEFAULT_CURRENCY)} an hour.`);
   }
   return out;
 }
