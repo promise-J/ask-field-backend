@@ -15,7 +15,7 @@ const ok = (fn: (req: Request) => Promise<unknown>, message = 'ok', code = 200) 
 
 router.get('/surveys/:id/finish', ...researcher, ok((r) => finishView(r.user!.id, r.params.id)));
 router.post('/surveys/:id/finish/return-to', ...researcher, validate(returnToSchema), ok((r) => setReturnTo(r.user!.id, r.params.id, r.body.to), 'Saved.'));
-router.post('/surveys/:id/run-again', ...researcher, ok((r) => runAgain(r.user!.id, r.params.id), 'Copied.', 201));
+router.post('/surveys/:id/run-again', ...researcher, ok((r) => runAgain(r.user!.id, r.params.id, { copy: r.body?.copy === true }), 'Copied.', 201));
 router.get('/researchers/me/closed-studies', ...researcher, ok((r) => closedStudies(r.user!.id)));
 router.get('/surveys/:id/results.csv', ...researcher, asyncHandler(async (req: Request, res: Response) => {
   const show = ['approved', 'other'].includes(String(req.query.show)) ? (req.query.show as 'approved' | 'other') : 'all';

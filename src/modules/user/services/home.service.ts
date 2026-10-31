@@ -72,6 +72,9 @@ export async function homeSummary(researcherId: string, selfId?: string) {
       stage: s.launchStage || 'none',
       funded: fundedBy.get(String(s._id)) || 0,
       settled: !!s.settlement, // Stage 8: its unused money has gone back
+      // The study row's ⋯ menu: Pause or Resume, and no pausing while joinStudy holds it after reports.
+      paused: Boolean(s.paused),
+      heldByJoinStudy: Boolean(s.reportHold?.at),
       updatedAt: s.updatedAt,
     };
   });

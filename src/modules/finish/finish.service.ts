@@ -295,7 +295,8 @@ export async function statementDocument(userId: string, id: string) {
 }
 
 /** "Run it again": a new draft with the same plan (dates cleared), ready to check and pay for. */
-export async function runAgain(userId: string, id: string) {
+/** "Run it again" on a closed study, or "Duplicate" from a study's ⋯ menu (`copy`: the new draft is named "… (copy)"). */
+export async function runAgain(userId: string, id: string, opts: { copy?: boolean } = {}) {
   const s = await owned(userId, id);
   if (!s.plan) throw new AppError('Only studies made in the planner can be copied.', 400);
   const plan = JSON.parse(JSON.stringify(s.plan));
@@ -307,13 +308,14 @@ export async function runAgain(userId: string, id: string) {
   }
   if (plan.setup?.sessions) plan.setup.sessions = []; // past sessions can't be booked
   if (plan.setup?.from) { delete plan.setup.from; delete plan.setup.to; }
+  if (opts.copy && plan.basics?.title) plan.basics.title = `${plan.basics.title} (copy)`.slice(0, 200);
   const copy: any = await SurveyModel.create({
     plan,
     userId,
     projectId: s.projectId,
     method: s.method,
     surveyType: s.surveyType,
-    surveyName: titleOf(s),
+    surveyName: opts.copy ? `${titleOf(s)} (copy)`.slice(0, 200) : titleOf(s),
     currency: s.currency,
   });
   return { surveyId: String(copy._id) };
