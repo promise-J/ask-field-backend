@@ -90,6 +90,10 @@ const envSchema = z.object({
   PAYOUT_PROVIDER: z.enum(['test']).default('test'),
   LINKEDIN_CLIENT_ID: z.string().optional(),
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
+
+  // Brevo
+  BREVO_API_KEY: z.string().optional(),
+  APP_NAME: z.string().default('JoinStudy'),
 });
 
 export const env = envSchema.parse(process.env);
