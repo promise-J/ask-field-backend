@@ -93,7 +93,7 @@ export async function launchView(userId: string, id: string) {
     paidIn: inSoFar,
     due: Math.max(0, round(view.figures.total - inSoFar)),
     credit,
-    payments: { cards, publishableKey: cards === 'stripe' ? env.STRIPE_PUBLISHABLE_KEY ?? null : null, invoices: true },
+    payments: { cards, publishableKey: cards === 'stripe' ? env.STRIPE_PUBLISHABLE_KEY ?? null : null, invoices: true, publishOnPayment: config.publishOnPayment },
     bookingNotReady: false, // Stage 6: booking is built, so interviews and focus groups can launch
     usesBooking: BOOKING.includes(view.method),
   };
@@ -219,7 +219,12 @@ export async function autoChecks(s: any) {
   return checks;
 }
 
+/**
+ * After payment (or after a study is sent back with changes). With PUBLISH_ON_PAYMENT on (the default) the study
+ * goes live straight away; with it off it waits for joinStudy's review (approve or ask for changes).
+ */
 async function startReview(s: any, why: string) {
+  if (config.publishOnPayment) return publishNow(s, why);
   s.launchStage = 'checking';
   s.review = { checks: await autoChecks(s), note: '', requestedAt: new Date(), decidedAt: undefined };
   await s.save();
@@ -229,6 +234,21 @@ async function startReview(s: any, why: string) {
     subject: `Study to review: ${s.plan?.basics?.title || s.surveyName}`,
     text: `${why}\nStudy ${s._id}\n${failed.length ? `Automatic checks flagged:\n- ${failed.join('\n- ')}` : 'Automatic checks passed.'}\n\nApprove: npm run review-study -- approve ${s._id}\nAsk for changes: npm run review-study -- changes ${s._id} "what to change"`,
   });
+}
+
+/** Puts a paid study live at once: participants who fit can see and take it. joinStudy's inbox is told, for the record. */
+async function publishNow(s: any, why: string) {
+  const now = new Date();
+  s.status = 'published';
+  s.publishedAt = now;
+  s.launchStage = 'none';
+  s.review = { checks: [], note: '', requestedAt: now, decidedAt: now };
+  s.markModified('review');
+  await s.save();
+  const title = s.plan?.basics?.title || s.surveyName;
+  const r: any = await ResearcherModel.findById(s.createdBy || s.userId).select('email firstName closedAt');
+  if (r && !r.closedAt) await sendMail({ to: r.email, subject: 'Your study is live', text: `Hi ${r.firstName || ''}, "${title}" is live. Matching participants can see it now.` });
+  await sendMail({ to: reviewInbox(), subject: `Study published: ${title}`, text: `${why}\nStudy ${s._id} went live on payment (PUBLISH_ON_PAYMENT is on, so there was no review).` });
 }
 
 /** Called by the webhook (Stripe), the test provider, the review script (invoices), or straight away for credit. Safe to call twice. */
@@ -254,7 +274,7 @@ export async function markPaid(fundingId: string, extra: { cardLast4?: string } 
   await sendMail({
     to: [f.receipt?.email, f.receipt?.cc].filter(Boolean).join(', '),
     subject: `Receipt ${f.number} from joinStudy`,
-    text: `Thanks. We received ${f.currency} ${(f.amount + f.creditUsed).toFixed(2)} for "${s?.plan?.basics?.title || s?.surveyName}". ${f.purpose === 'add-places' ? `The ${f.extraPlaces} extra places are open now.` : 'We’re checking your study now and will email you when it’s live.'}`,
+    text: `Thanks. We received ${f.currency} ${(f.amount + f.creditUsed).toFixed(2)} for "${s?.plan?.basics?.title || s?.surveyName}". ${f.purpose === 'add-places' ? `The ${f.extraPlaces} extra places are open now.` : (config.publishOnPayment ? 'Your study is live now.' : 'We’re checking your study now and will email you when it’s live.')}`,
   });
   return f;
 }
@@ -267,7 +287,7 @@ export async function resubmit(userId: string, id: string) {
   if (!view.ready) throw new AppError('Finish your plan first.', 400, 'plan_incomplete', { missing: view.missing });
   if (view.due > 0) throw new AppError(`Your changes add ${view.figures.currency} ${view.due.toFixed(2)}. Pay the difference to send it back.`, 402, 'top_up_needed', { due: view.due });
   await startReview(s, 'Sent back after changes.');
-  return { fundingId: null, status: 'checking' as const, method: null };
+  return { fundingId: null, status: config.publishOnPayment ? ('live' as const) : ('checking' as const), method: null };
 }
 
 // ---------------------------------------------------------------- the team's side (review-study script)

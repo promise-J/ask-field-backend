@@ -15,8 +15,6 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().optional(),
   ACCESS_TOKEN_TTL: z.string().default('1h'),
   REFRESH_TOKEN_TTL: z.string().default('28d'),
-  BREVO_API_KEY: z.string(),
-  APP_NAME: z.string(),
   // Alpha feedback: sign people out after this many minutes without activity (both token lifetimes are capped at it,
   // and renewing only works within it). 0 turns it off, so REFRESH_TOKEN_TTL applies again.
   SESSION_IDLE_MINUTES: z.string().default('20'),
@@ -63,6 +61,9 @@ const envSchema = z.object({
   INVOICE_BANK_DETAILS: z.string().optional(),
   // Where "a study is waiting for review" emails go.
   REVIEW_INBOX: z.string().optional(),
+  // A paid study goes live as soon as its payment is confirmed (true, the default). false: it waits for
+  // joinStudy's review (npm run review-study -- approve <id>) before participants can see it.
+  PUBLISH_ON_PAYMENT: z.string().default('true'),
   // Participant Stage 7: the Help contact form, and reports about studies (both default to LEADS_INBOX).
   SUPPORT_INBOX: z.string().optional(),
   TRUST_INBOX: z.string().optional(),
@@ -111,4 +112,5 @@ export const config = {
   participantCountries: env.PARTICIPANT_COUNTRIES.split(',').map((s) => s.trim()).filter(Boolean),
   phoneHashSecret: env.PHONE_HASH_SECRET || `${env.JWT_SECRET}.phone`,
   idleMinutes: Math.max(0, Number(env.SESSION_IDLE_MINUTES) || 0),
+  publishOnPayment: env.PUBLISH_ON_PAYMENT.trim().toLowerCase() !== 'false',
 };
