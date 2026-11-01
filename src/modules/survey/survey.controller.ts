@@ -118,6 +118,12 @@ export const launchPay = asyncHandler(async (req: Request, res: Response) => {
 export const launchResubmit = asyncHandler(async (req: Request, res: Response) => {
   apiSuccessResponse(res, 'Sent back to us.', await launch.resubmit(req.user!.id, req.params.id));
 });
+export const launchPublish = asyncHandler(async (req: Request, res: Response) => {
+  apiSuccessResponse(res, 'Your study is live.', await launch.publish(req.user!.id, req.params.id));
+});
+export const launchRefund = asyncHandler(async (req: Request, res: Response) => {
+  apiSuccessResponse(res, 'Cancelled. Your money is on its way back.', await launch.refundUnpublished(req.user!.id, req.params.id));
+});
 export const launchCancelInvoice = asyncHandler(async (req: Request, res: Response) => {
   apiSuccessResponse(res, 'Invoice cancelled.', await launch.cancelInvoice(req.user!.id, req.params.id));
 });

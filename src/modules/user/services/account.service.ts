@@ -58,14 +58,14 @@ export async function login(email: string, password: string, accountType?: UserT
   return { needsChoice: true, choices: matched.map((m) => m.type) } as Choice;
 }
 
-export async function google(idToken: string, opts: { accountType?: UserType; intent?: UserType; method?: string; country?: string; agree?: boolean }) {
+export async function google(idToken: string, opts: { accountType?: UserType; intent?: UserType; method?: string; country?: string; agree?: boolean; ref?: string }) {
   const profile = await verifyFirebaseIdToken(idToken);
   const existing = (await accountsFor(profile.email)).map((a) => a.type);
   const target = opts.accountType ?? (opts.intent && (existing.includes(opts.intent) || !existing.length || opts.intent === 'researcher') ? opts.intent : undefined);
   if (target) {
     let extra: Record<string, unknown> = target === 'researcher' && opts.method ? { signupIntent: { method: opts.method, source: 'google' } } : {};
     if (target === 'participant' && !existing.includes('participant')) extra = newParticipantExtras(opts);
-    return services[target].googleAuthWithProfile(profile, extra);
+    return services[target].googleAuthWithProfile(profile, extra, opts.ref);
   }
   if (existing.length === 1) return services[existing[0]].googleAuthWithProfile(profile);
   if (existing.length > 1) return { needsChoice: true, choices: existing } as Choice;

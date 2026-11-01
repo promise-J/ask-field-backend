@@ -100,7 +100,7 @@ export async function reviewView(userId: string, id: string) {
     method: methodOf(s),
     plannedMinutes: minutes,
     perPerson: Number(s.plan?.pay?.perPerson) || s.surveyAmount || 0,
-    feeRate: await feeRateFor(userId),
+    feeRate: await feeRateFor(userId, s._id),
     currency: s.currency || env.DEFAULT_CURRENCY,
     autoApproveDays: AUTO_APPROVE_DAYS,
     reviewMode: s.plan?.pay?.review === 'auto' ? 'auto' : 'manual',

@@ -22,6 +22,9 @@ router.get('/:id/launch', researcher, c.getLaunch);
 router.post('/:id/launch/pay', researcher, validate(launchPaySchema), c.launchPay);
 router.post('/:id/launch/resubmit', researcher, c.launchResubmit);
 router.post('/:id/launch/cancel-invoice', researcher, c.launchCancelInvoice);
+// After payment: "Publish now", or cancel a paid study that isn't live and get the money back.
+router.post('/:id/launch/publish', researcher, c.launchPublish);
+router.post('/:id/launch/refund', researcher, c.launchRefund);
 router.post('/create-draft-survey', researcher, validate(createDraftSurveySchema), c.createDraftSurvey);
 router.put('/update-draft-survey/:id', researcher, validate(updateDraftSurveySchema), c.updateDraftSurvey);
 router.post('/publish-draft-survey/:id', researcher, c.publishDraftSurvey);

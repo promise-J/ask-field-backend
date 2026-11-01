@@ -113,10 +113,19 @@ const participantSchema = new Schema(
     signedOutAt: Date,
     keepSession: String, // the sign-in that did "Sign out everywhere else" (or changed the password) stays signed in
     closedAt: Date,
+    // The waitlist per country (Refer a friend). No `access` = active (everyone who joined before the waitlist).
+    // waiting people see no studies and get no study emails until there's room; invites move them up (score).
+    access: {
+      status: { type: String, enum: ['active', 'waiting'] },
+      since: Date,
+      admittedAt: Date,
+      score: { type: Number, default: 0 },
+    },
   },
   { timestamps: true }
 );
 
+participantSchema.index({ country: 1, 'access.status': 1 });
 participantSchema.index({ 'verification.phoneHash': 1 }, { sparse: true });
 participantSchema.index({ 'linkedin.sub': 1 }, { sparse: true });
 participantSchema.index({ 'payout.accountHash': 1 }, { unique: true, sparse: true });

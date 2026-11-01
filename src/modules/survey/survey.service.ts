@@ -154,7 +154,7 @@ export class SurveyService {
       const byStep = missingByStep(method, plan);
       const left = STEPS.flatMap((k) => byStep[k]);
       if (left.length) throw new AppError(`Finish your plan first: ${left.join(' ')}`, 400, 'plan_incomplete', { missing: byStep });
-      throw new AppError('Pay for your study to launch it. We check it, then it goes live.', 402, 'payment_required');
+      throw new AppError('Pay for your study first, then publish it.', 402, 'payment_required');
     } else {
       const missing = missingForPublish(survey);
       if (missing.length) throw new AppError(`Add these before publishing: ${missing.join(', ')}.`, 400);
@@ -471,7 +471,7 @@ export class SurveyService {
     action.reviewedAt = new Date();
     action.set('review', { by: meta.by || 'researcher', reason: meta.reason, note: meta.note });
     await action.save();
-    if (decision === 'approved') await ledger.approve(action, await feeRateFor(researcherId));
+    if (decision === 'approved') await ledger.approve(action, await feeRateFor(researcherId, action.surveyId));
     else await ledger.reject(action, meta.why);
     return action;
   }

@@ -129,10 +129,16 @@ export async function reviewVerification(email: string, decision: 'verified' | '
   return user.toJSON();
 }
 
-/** The fee added to rewards when this researcher approves work. */
-export async function feeRateFor(researcherId: string) {
+/**
+ * The fee added to rewards when this researcher approves work.
+ * Refer a friend: a researcher who signed up with a friend's link pays the academic fee on their first study
+ * (pass `surveyId` so it applies to that study only once it's paid; see referral.service `welcomeRate`).
+ */
+export async function feeRateFor(researcherId: string, surveyId?: unknown) {
   const user = (await ResearcherModel.findById(researcherId)) as any;
   const academic = user && canVerify(user) && status(user) === 'verified';
-  return academic ? config.academicFeeRate : config.platformFeeRate;
+  if (academic) return config.academicFeeRate;
+  const { welcomeRate } = await import('../../referrals/referral.service');
+  return user && (await welcomeRate(user, surveyId)) ? config.academicFeeRate : config.platformFeeRate;
 }
 

@@ -20,6 +20,10 @@ const transactionSchema = new Schema(
     // "<surveyActionId>:<kind>" for earnings and charges, so retries can't pay or charge twice.
     ledgerKey: { type: String, unique: true, sparse: true },
     description: String,
+    // Refer a friend: credit earned by referring (source 'referral') expires; it is spent before other credit.
+    source: String,
+    expiresAt: Date,
+    remindedAt: Date,
     payoutDetails: { method: String, bankName: String, accountName: String, accountNumberLast4: String },
     // Participant Stage 6: a cash-out in the participant's own currency, sent by the payout provider.
     payout: {

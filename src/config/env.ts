@@ -34,6 +34,8 @@ const envSchema = z.object({
   REQUIRE_EMAIL_VERIFICATION: bool(true),
   // Where founding-lab, request-a-country and AI-pilot form submissions are emailed.
   LEADS_INBOX: z.string().default('hello@joinstudy.io'),
+  BREVO_API_KEY: z.string().optional(),
+  APP_NAME: z.string().default('JoinStudy'),
 
   // Firebase Admin, used to verify "Continue with Google" sign-ins from the frontend.
   FIREBASE_PROJECT_ID: z.string().optional(),
@@ -61,9 +63,9 @@ const envSchema = z.object({
   INVOICE_BANK_DETAILS: z.string().optional(),
   // Where "a study is waiting for review" emails go.
   REVIEW_INBOX: z.string().optional(),
-  // A paid study goes live as soon as its payment is confirmed (true, the default). false: it waits for
-  // joinStudy's review (npm run review-study -- approve <id>) before participants can see it.
-  PUBLISH_ON_PAYMENT: z.string().default('true'),
+  // After payment a study waits for the researcher to click "Publish now". With REVIEW_BEFORE_PUBLISH=true it is
+  // checked by joinStudy first (npm run review-study -- approve <id>), then waits for "Publish now".
+  REVIEW_BEFORE_PUBLISH: bool(false),
   // Participant Stage 7: the Help contact form, and reports about studies (both default to LEADS_INBOX).
   SUPPORT_INBOX: z.string().optional(),
   TRUST_INBOX: z.string().optional(),
@@ -91,9 +93,24 @@ const envSchema = z.object({
   LINKEDIN_CLIENT_ID: z.string().optional(),
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
 
-  // Brevo
-  BREVO_API_KEY: z.string().optional(),
-  APP_NAME: z.string().default('JoinStudy'),
+  // Refer a friend (researchers): a referred researcher pays the academic fee on their first study, and the
+  // referrer earns credit: REFERRAL_SHARE of the friend's fees in their first REFERRAL_WINDOW_DAYS, at most
+  // REFERRAL_FRIEND_CAP per friend and REFERRAL_YEAR_CAP a year (both in DEFAULT_CURRENCY). Credit expires
+  // after REFERRAL_CREDIT_MONTHS. REFERRALS=false hides the feature and stops new rewards.
+  REFERRALS: bool(true),
+  REFERRAL_SHARE: z.string().default('0.25'),
+  REFERRAL_WINDOW_DAYS: z.string().default('90'),
+  REFERRAL_FRIEND_CAP: z.string().default('25'),
+  REFERRAL_YEAR_CAP: z.string().default('250'),
+  REFERRAL_CREDIT_MONTHS: z.string().default('12'),
+  // Participants: a waitlist per country. Room = WAITLIST_MIN_SEATS + WAITLIST_PLACES_FACTOR x open places in live
+  // studies for that country. People already active stay active. Inviting friends moves you up the queue.
+  PARTICIPANT_WAITLIST: bool(true),
+  WAITLIST_MIN_SEATS: z.string().default('300'),
+  WAITLIST_PLACES_FACTOR: z.string().default('3'),
+  // Cash for a participant whose invited friend gets PARTICIPANT_REFERRAL_STUDIES studies approved. 0 = no cash.
+  PARTICIPANT_REFERRAL_REWARD: z.string().default('0'),
+  PARTICIPANT_REFERRAL_STUDIES: z.string().default('3'),
 });
 
 export const env = envSchema.parse(process.env);
@@ -116,5 +133,20 @@ export const config = {
   participantCountries: env.PARTICIPANT_COUNTRIES.split(',').map((s) => s.trim()).filter(Boolean),
   phoneHashSecret: env.PHONE_HASH_SECRET || `${env.JWT_SECRET}.phone`,
   idleMinutes: Math.max(0, Number(env.SESSION_IDLE_MINUTES) || 0),
-  publishOnPayment: env.PUBLISH_ON_PAYMENT.trim().toLowerCase() !== 'false',
+  reviewBeforePublish: env.REVIEW_BEFORE_PUBLISH,
+  referrals: {
+    on: env.REFERRALS,
+    share: Number(env.REFERRAL_SHARE),
+    windowDays: Number(env.REFERRAL_WINDOW_DAYS),
+    friendCap: Number(env.REFERRAL_FRIEND_CAP),
+    yearCap: Number(env.REFERRAL_YEAR_CAP),
+    creditMonths: Number(env.REFERRAL_CREDIT_MONTHS),
+    participantReward: Math.max(0, Number(env.PARTICIPANT_REFERRAL_REWARD) || 0),
+    participantStudies: Math.max(1, Number(env.PARTICIPANT_REFERRAL_STUDIES) || 3),
+  },
+  waitlist: {
+    on: env.PARTICIPANT_WAITLIST,
+    minSeats: Math.max(0, Number(env.WAITLIST_MIN_SEATS) || 0),
+    factor: Math.max(0, Number(env.WAITLIST_PLACES_FACTOR) || 0),
+  },
 };

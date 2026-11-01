@@ -7,6 +7,9 @@ import { sendStudyAlerts } from './modules/studies/studies.service';
 import { expireHolds } from './modules/survey/holds';
 import { syncPayouts } from './modules/payouts/payouts.service';
 import { sweepClosedIdentities } from './modules/account/models';
+import { sweepReferrals } from './modules/referrals/referral.service';
+import { admitWaiting } from './modules/referrals/waitlist.service';
+import { remindUnpublished } from './modules/billing/launch.service';
 
 const REMINDER_EVERY_MS = 5 * 60 * 1000;
 
@@ -29,10 +32,17 @@ async function bootstrap() {
         expireHolds().catch((error) => logger.error({ error }, 'Expiring holds failed'));
         // Participant Stage 6: how each cash-out is doing with the payout provider.
         syncPayouts().catch((error) => logger.error({ error }, 'Payout sync failed'));
+        // Paid but not published after 2 days: one reminder.
+        remindUnpublished().catch((error) => logger.error({ error }, 'Publish reminders failed'));
       }, REMINDER_EVERY_MS).unref();
       // Participant Stage 3: "A new study fits you" emails, at most one a day per person.
       setInterval(() => sweepClosedIdentities().catch((error) => logger.error({ error }, 'Sweeping closed-account codes failed')), 60 * 60 * 1000).unref();
       setInterval(() => sendStudyAlerts().catch((error) => logger.error({ error }, 'Study alerts failed')), 60 * 60 * 1000).unref();
+      // Refer a friend: rewards and expiry reminders, and letting people in from the participant waitlist.
+      setInterval(() => {
+        sweepReferrals().catch((error) => logger.error({ error }, 'Referral sweep failed'));
+        admitWaiting().catch((error) => logger.error({ error }, 'Waitlist admission failed'));
+      }, 60 * 60 * 1000).unref();
     }
 
     app.listen(env.PORT, () => {

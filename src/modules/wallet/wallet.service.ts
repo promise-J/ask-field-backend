@@ -119,14 +119,18 @@ export class WalletService {
     ]);
     // Stage 5: payments made for studies, with their receipts or invoices.
     const { FundingModel } = await import('../billing/funding.model');
-    const { creditBalance } = await import('../billing/launch.service');
+    const { creditLedger } = await import('../billing/launch.service');
+    const credit = await creditLedger(researcherId);
     const fundings = await FundingModel.find({ researcherId: owner, status: { $ne: 'cancelled' } }).sort({ createdAt: -1 }).limit(100);
     const titles = new Map((await SurveyModel.find({ _id: { $in: fundings.map((f: any) => f.surveyId) } }).select('surveyName')).map((x: any) => [String(x._id), x.surveyName]));
     return {
       currency: env.DEFAULT_CURRENCY,
       spent,
       feeRate: config.platformFeeRate,
-      credit: await creditBalance(researcherId),
+      credit: credit.balance,
+      // Refer a friend: referral credit expires; the Payments page shows the next amount to expire.
+      referralCredit: credit.referral,
+      creditExpiry: credit.nextExpiry,
       // Stage 9: who in the workspace paid each one.
       fundings: await (async () => {
         const { ResearcherModel } = await import('../user/models/researcher.model');

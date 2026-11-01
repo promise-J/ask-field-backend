@@ -1,26 +1,31 @@
 import crypto from 'crypto';
 import { isValidObjectId, Types } from 'mongoose';
 import AppError from '../../error-helpers/appError';
-import { env } from '../../config/env';
+import { config, env } from '../../config/env';
 import logger from '../../config/logger';
 import { sendMail } from '../../utils/mailer';
 import { SurveyActionModel, SurveyModel } from '../survey/survey.model';
-import { ParticipantModel } from '../user/models/participant.model';
-import { ResearcherModel } from '../user/models/researcher.model';
 import { ageOn } from '../user/controllers/participant.controller';
 import { fitsStudy, hourly, isOpenNow, placesAndMinutes, toSex, type Method } from '../survey/plan';
-import { VERIFY_FIRST } from '../verification/gate';
-import { WalletService } from '../wallet/wallet.service';
 
-const wallet = new WalletService();
+
+
 import { HIDE_REASONS, StudyHideModel, type HideReason } from './studyHide.model';
 import { holdsPlaces, takenCounts } from '../survey/holds';
 import { isExpired, outcomeOf, SurveyService } from '../survey/survey.service';
 import { cancelBooking } from '../run/booking.service';
 import { BookingModel } from '../run/booking.model';
 import { studyContact } from '../team/contact';
+import { isWaiting } from '../referrals/waitlist.service';
+import { researcherBadges } from '../referrals/referral.service';
+import { ParticipantModel } from '../user/models/participant.model';
+import { ResearcherModel } from '../user/models/researcher.model';
+import { VERIFY_FIRST } from '../verification/gate';
+import { WalletService } from '../wallet/wallet.service';
 
 const surveys = new SurveyService();
+const wallet = new WalletService();
+
 
 /**
  * Participant Stage 3: finding studies (canvas 3.1–3.4).
@@ -76,9 +81,14 @@ const verificationOf = (participant: any) => {
 
 async function researchersOf(surveys: any[]) {
   const ids = [...new Set(surveys.map((s) => String(s.userId)))];
-  const people = ids.length ? await ResearcherModel.find({ _id: { $in: ids } }).select('firstName lastName organizationName companyName') : [];
+  const people = ids.length ? await ResearcherModel.find({ _id: { $in: ids } }).select('firstName lastName organizationName companyName email') : [];
+  // Refer a friend: "Founding lab" and "Trusted researcher" on study cards and pages.
+  const badges = await researcherBadges(people as any[]);
   return new Map(
-    people.map((r: any) => [String(r._id), { name: `${r.firstName || ''} ${r.lastName || ''}`.trim(), organization: r.organizationName || r.companyName || '' }])
+    people.map((r: any) => [
+      String(r._id),
+      { name: `${r.firstName || ''} ${r.lastName || ''}`.trim(), organization: r.organizationName || r.companyName || '', badges: badges.get(String(r._id)) || [] },
+    ])
   );
 }
 
@@ -96,7 +106,7 @@ async function filledCounts(surveys: any[], now = new Date()) {
 }
 
 /** The facts on a study card and at the top of a study page. Pay is in the study's currency (USD by default). */
-export function cardOf(s: any, extra: { filled?: number; researcher?: { name: string; organization: string } | null } = {}) {
+export function cardOf(s: any, extra: { filled?: number; researcher?: { name: string; organization: string; badges?: string[] } | null } = {}) {
   const plan = s.plan || {};
   const method = methodOf(s);
   const fromPlan = placesAndMinutes(method, plan);
@@ -135,8 +145,20 @@ async function openStudies(now = new Date(), extraFilter: Record<string, unknown
     .filter(({ s, filled: n }) => n < cardOf(s).places);
 }
 
-/** Studies this person fits and hasn't done, hidden or started. */
+/** Refer a friend: open places in live studies, per participant country (the waitlist makes room from these). */
+export async function openPlacesByCountry(now = new Date()) {
+  const out = new Map<string, number>();
+  for (const { s, filled } of await openStudies(now)) {
+    const left = Math.max(0, cardOf(s).places - filled);
+    const wanted: string[] = s.plan?.audience?.countries?.length ? s.plan.audience.countries : config.participantCountries;
+    for (const c of wanted) out.set(c, (out.get(c) || 0) + left);
+  }
+  return out;
+}
+
+/** Studies this person fits and hasn't done, hidden or started. Nothing while they're on the waitlist. */
 export async function studiesFor(participant: any, now = new Date()) {
+  if (isWaiting(participant)) return [];
   const pid = participant._id;
   const [open, actions, hides] = await Promise.all([
     openStudies(now),
@@ -203,8 +225,9 @@ export async function home(participantId: string) {
     })
     .filter(Boolean);
 
-  let situation: 'profile' | 'waiting' | 'verify' | 'ready' | 'all-set';
-  if (!complete) situation = 'profile';
+  let situation: 'profile' | 'waiting' | 'verify' | 'ready' | 'all-set' | 'waitlist';
+  if (isWaiting(p)) situation = 'waitlist';
+  else if (!complete) situation = 'profile';
   else if (!studies.length) situation = doneCount > 0 ? 'all-set' : 'waiting';
   else situation = v.clear ? 'ready' : 'verify';
 
@@ -220,6 +243,8 @@ export async function home(participantId: string) {
     inProgress,
     doneCount,
     alerts: { email: !!p.receivesUpdates },
+    // Refer a friend: the queue (position, country) while waiting.
+    waitlist: isWaiting(p) ? await (await import('../referrals/waitlist.service')).waitlistOf(p) : null,
     money: { currency: money.currency, waiting: money.pending, ready: money.available, minPayout: money.minPayout },
   };
 }
@@ -247,12 +272,13 @@ export async function studyPage(participantId: string, id: string, now = new Dat
   const again = mine === 'left' || mine === 'timed-out';
 
   // What the page can offer, in order of what blocks it.
-  let state: 'in-progress' | 'done' | 'closed' | 'full' | 'not-for-you' | 'verify' | 'blocked' | 'start';
+  let state: 'in-progress' | 'done' | 'closed' | 'full' | 'not-for-you' | 'verify' | 'blocked' | 'start' | 'waitlist';
   if (mine === 'in-progress') state = 'in-progress';
   else if (mine && !again) state = 'done';
   else if (!live) state = 'closed';
   else if (!open) state = 'full';
   else if (!fit.ok) state = 'not-for-you';
+  else if (isWaiting(p)) state = 'waitlist';
   else if (v.blockedMessage) state = 'blocked';
   else if (!v.clear) state = 'verify';
   else state = 'start';
@@ -401,6 +427,7 @@ export async function sendStudyAlerts(now = new Date()) {
     isCompleteProfile: true,
     isVerified: true,
     'verification.status': { $nin: ['duplicate', 'rejected'] },
+    'access.status': { $ne: 'waiting' }, // Refer a friend: nobody on the waitlist gets study emails
     $or: [{ studyAlertAt: { $exists: false } }, { studyAlertAt: null }, { studyAlertAt: { $lt: new Date(now.getTime() - ALERT_GAP_MS) } }],
   }).cursor();
   let sent = 0;

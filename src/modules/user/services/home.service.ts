@@ -10,6 +10,7 @@ import { sendMail } from '../../../utils/mailer';
 import { feeRateFor } from './setup.service';
 import { FundingModel } from '../../billing/funding.model';
 import { creditBalance } from '../../billing/launch.service';
+import { config } from '../../../config/env';
 import { missingByStep, STEPS } from '../../survey/plan';
 
 const STATUS: Record<string, 'draft' | 'live' | 'closed'> = { draft: 'draft', published: 'live', closed: 'closed' };
@@ -81,6 +82,10 @@ export async function homeSummary(researcherId: string, selfId?: string) {
 
   const notes = new Map(surveys.map((s: any) => [String(s._id), s.review?.note || '']));
   const needsYou = [
+    // Paid and waiting for "Publish now".
+    ...studies
+      .filter((s) => s.status === 'draft' && s.stage === 'ready')
+      .map((s) => ({ kind: 'publish' as const, surveyId: s.surveyId, projectId: s.projectId, name: s.name, count: 1 })),
     ...studies
       .filter((s) => s.stage === 'changes-needed')
       .map((s) => ({ kind: 'changes' as const, surveyId: s.surveyId, projectId: s.projectId, name: s.name, count: 1, note: notes.get(s.surveyId) || '' })),
@@ -124,6 +129,15 @@ export async function homeSummary(researcherId: string, selfId?: string) {
       currency: env.DEFAULT_CURRENCY,
     },
     founding,
+    // Refer a friend: the dashboard card (hidden with "Not now"). Referrals belong to the person signed in.
+    referral: config.referrals.on
+      ? {
+          show: !(selfId && selfId !== researcherId ? (await ResearcherModel.findById(selfId).select('referralCardHiddenAt'))?.get('referralCardHiddenAt') : me.get('referralCardHiddenAt')),
+          friendFeeRate: config.academicFeeRate,
+          share: config.referrals.share,
+          friendCap: config.referrals.friendCap,
+        }
+      : null,
   };
 }
 

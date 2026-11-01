@@ -45,7 +45,18 @@ export class AuthService {
     return { ...issueTokens({ id: String(user._id), userType: this.userType, sid: randomToken(8) }), user: user.toJSON(), userType: this.userType };
   }
 
-  async register(data: Record<string, any>) {
+  /** Refer a friend: link the invite, and put a new participant in their country's queue when it's full. */
+  private async afterSignup(user: any, ref?: unknown) {
+    const { attachReferral } = await import('../../referrals/referral.service');
+    await attachReferral(this.userType, user, ref);
+    if (this.userType === 'participant') {
+      const { placeOnSignup } = await import('../../referrals/waitlist.service');
+      await placeOnSignup(user);
+    }
+  }
+
+  async register(input: Record<string, any>) {
+    const { ref, ...data } = input;
     const email = normal(data.email);
     const existing = await this.model.findOne({ email });
     if (existing) {
@@ -58,6 +69,7 @@ export class AuthService {
       password: await hashPassword(data.password),
       isVerified: !env.REQUIRE_EMAIL_VERIFICATION,
     });
+    await this.afterSignup(user, ref);
     if (env.REQUIRE_EMAIL_VERIFICATION) await this.sendVerification(user);
     return user.toJSON();
   }
@@ -151,9 +163,11 @@ export class AuthService {
   }
 
   /** Signs in with Google, creating the account when there is none. */
-  async googleAuthWithProfile(g: GoogleProfile, extra: Record<string, unknown> = {}) {
+  async googleAuthWithProfile(g: GoogleProfile, extra: Record<string, unknown> = {}, ref?: unknown) {
     let user = await this.model.findOne({ email: g.email });
+    let created = false;
     if (!user) {
+      created = true;
       user = await this.model.create({
         ...extra,
         email: g.email,
@@ -164,10 +178,12 @@ export class AuthService {
         isVerified: true,
         image: g.imageUrl ? { imageUrl: g.imageUrl } : undefined,
       });
+      await this.afterSignup(user, ref);
     } else {
       if (!user.googleId) user.googleId = g.googleId;
       if (!user.isVerified && g.emailVerified) user.isVerified = true;
     }
+    if (created) user = (await this.model.findById(user._id)) || user; // picks up referredBy and the queue
     user.lastLoginAt = new Date();
     await user.save();
     return this.session(user);

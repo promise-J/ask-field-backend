@@ -30,6 +30,9 @@ export const accountFields = {
   resetTokenExpires: { type: Date, default: null, select: false },
   isCompleteProfile: { type: Boolean, default: false },
   lastLoginAt: { type: Date },
+  // Refer a friend: this person's own code (made the first time they open the Refer page) and who invited them.
+  referralCode: { type: String, trim: true, uppercase: true, index: { unique: true, sparse: true } },
+  referredBy: { type: Schema.Types.ObjectId },
 };
 
 /** Removes secrets when a document is turned into JSON for an API response. */

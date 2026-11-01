@@ -63,7 +63,12 @@ const surveySchema = new Schema(
     reportHold: { at: Date, reports: Number },
     // Participant Stage 4: when we last told the researcher someone left because the link didn't work (once a day at most).
     linkProblemAt: Date,
-    launchStage: { type: String, enum: ['none', 'awaiting-payment', 'checking', 'changes-needed', 'rejected'], default: 'none', index: true },
+    // ready = paid (and approved, when REVIEW_BEFORE_PUBLISH is on): waiting for the researcher to click "Publish now".
+    launchStage: { type: String, enum: ['none', 'awaiting-payment', 'checking', 'changes-needed', 'ready', 'rejected'], default: 'none', index: true },
+    // Ticked at checkout ("Publish automatically when the payment arrives"): skips "ready" and goes live on payment.
+    publishWhenPaid: { type: Boolean, default: false },
+    readyAt: Date,
+    readyReminderAt: Date,
     review: {
       checks: { type: [{ _id: false, key: String, label: String, ok: Boolean, note: String }], default: undefined },
       note: String,

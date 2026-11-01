@@ -12,6 +12,9 @@
       "typeRoots": ["./node_modules/@types", "./src/types"]
       // "include": ["src", "types"]
     },
-    "include": ["src/**/*"] 
+    "include": ["src/**/*"],
+    "ts-node": {
+      "files": true
+    }
     // "include": ["src/**/*.ts", "src/types/**/*.d.ts"]
   }

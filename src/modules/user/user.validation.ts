@@ -24,6 +24,7 @@ export const registerParticipantSchema = z
     agree,
     receivesUpdates: z.boolean().optional(),
     turnstileToken: z.string().max(4096).optional(),
+    ref: z.string().trim().max(20).optional(), // Refer a friend: the invite code from /r/:code
   })
   .transform(({ agree: _a, turnstileToken: _t, ...rest }) => ({ ...rest, agreedTermsAt: new Date() }));
 
@@ -60,6 +61,7 @@ export const registerResearcherSchema = z
     organizationName: z.string().trim().max(160).optional(),
     organizationType: z.string().trim().max(80).optional(),
     country: z.string().trim().max(80).optional(),
+    ref: z.string().trim().max(20).optional(), // Refer a friend: the invite code from /r/:code
   })
   .transform((v, ctx) => {
     let first = v.firstName ?? '';
@@ -100,6 +102,7 @@ export const unifiedGoogleSchema = z.object({
   // A NEW participant account through Google needs the same country and agreement as the email form.
   country: z.string().trim().max(80).optional(),
   agree: z.boolean().optional(),
+  ref: z.string().trim().max(20).optional(), // Refer a friend: the invite code, used only when a new account is made
 });
 
 export const resendVerificationSchema = z.object({ email, accountType: accountType.optional() });

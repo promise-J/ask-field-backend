@@ -12,6 +12,7 @@ import reviewRoutes from '../modules/review/review.routes';
 import finishRoutes from '../modules/finish/finish.routes';
 import teamRoutes from '../modules/team/team.routes';
 import { COUNTRY_LANGUAGES, REGIONS } from '../modules/user/profile.options';
+import { participantReferralRoutes, publicReferralRoutes, researcherReferralRoutes } from '../modules/referrals/referral.routes';
 
 const router = Router();
 
@@ -40,6 +41,10 @@ router.use('/', reviewRoutes); // Stage 7
 router.use('/', finishRoutes); // Stage 8
 router.use('/', teamRoutes); // Stage 9
 router.use('/billing', billingRoutes);
+// Refer a friend (before the account routers so these paths win).
+router.use('/referrals', publicReferralRoutes);
+router.use('/researchers/me/referrals', researcherReferralRoutes);
+router.use('/participants/me/referrals', participantReferralRoutes);
 router.use('/participants', participantRoutes);
 router.use('/researchers', researcherRoutes);
 router.use('/projects', projectRoutes);

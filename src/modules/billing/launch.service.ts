@@ -34,15 +34,51 @@ export async function paidIn(surveyId: unknown) {
   return round(rows.reduce((t, f: any) => t + (f.amount || 0) + (f.creditUsed || 0), 0));
 }
 
-/** Credit the researcher can spend: money returned as credit, minus credit already used. */
+type Bucket = { id: string; left: number; referral: boolean; expiresAt: Date | null };
+
+/**
+ * The researcher's credit, worked out line by line in date order. Money returned as credit never expires;
+ * referral credit (Refer a friend) expires and is spent first, soonest to expire first. Credit that expired
+ * before it was spent is gone.
+ */
+export async function creditLedger(researcherId: string, now = new Date()) {
+  const rows: any[] = await TransactionModel.find({ ownerId: new Types.ObjectId(researcherId), kind: { $in: ['credit', 'credit-used'] }, status: { $in: ['available', 'paid'] } })
+    .sort({ createdAt: 1, _id: 1 })
+    .select('kind amount source expiresAt createdAt')
+    .lean();
+  const buckets: Bucket[] = [];
+  const alive = (b: Bucket, at: Date) => b.left > 0.004 && (!b.expiresAt || b.expiresAt > at);
+  for (const r of rows) {
+    if (r.kind === 'credit') {
+      buckets.push({ id: String(r._id), left: r.amount || 0, referral: r.source === 'referral', expiresAt: r.expiresAt ? new Date(r.expiresAt) : null });
+      continue;
+    }
+    const at = new Date(r.createdAt);
+    let need = r.amount || 0;
+    const order = buckets
+      .filter((b) => alive(b, at))
+      .sort((x, y) => Number(y.referral) - Number(x.referral) || (x.expiresAt?.getTime() ?? Infinity) - (y.expiresAt?.getTime() ?? Infinity));
+    for (const b of order) {
+      if (need <= 0) break;
+      const take = Math.min(b.left, need);
+      b.left = round(b.left - take);
+      need = round(need - take);
+    }
+  }
+  const live = buckets.filter((b) => alive(b, now));
+  const referralLive = live.filter((b) => b.referral);
+  const soonest = referralLive.filter((b) => b.expiresAt).sort((x, y) => x.expiresAt!.getTime() - y.expiresAt!.getTime())[0];
+  return {
+    balance: round(live.reduce((t, b) => t + b.left, 0)),
+    referral: round(referralLive.reduce((t, b) => t + b.left, 0)),
+    nextExpiry: soonest ? { amount: round(referralLive.filter((b) => b.expiresAt?.getTime() === soonest.expiresAt!.getTime()).reduce((t, b) => t + b.left, 0)), at: soonest.expiresAt } : null,
+    buckets: live,
+  };
+}
+
+/** Credit the researcher can spend now. */
 export async function creditBalance(researcherId: string) {
-  const owner = new Types.ObjectId(researcherId);
-  const rows = await TransactionModel.aggregate([
-    { $match: { ownerId: owner, kind: { $in: ['credit', 'credit-used'] }, status: { $in: ['available', 'paid'] } } },
-    { $group: { _id: '$kind', total: { $sum: '$amount' } } },
-  ]);
-  const by = Object.fromEntries(rows.map((r: any) => [r._id, r.total]));
-  return Math.max(0, round((by.credit || 0) - (by['credit-used'] || 0)));
+  return Math.max(0, (await creditLedger(researcherId)).balance);
 }
 
 async function nextNumber() {
@@ -93,7 +129,11 @@ export async function launchView(userId: string, id: string) {
     paidIn: inSoFar,
     due: Math.max(0, round(view.figures.total - inSoFar)),
     credit,
-    payments: { cards, publishableKey: cards === 'stripe' ? env.STRIPE_PUBLISHABLE_KEY ?? null : null, invoices: true, publishOnPayment: config.publishOnPayment },
+    payments: { cards, publishableKey: cards === 'stripe' ? env.STRIPE_PUBLISHABLE_KEY ?? null : null, invoices: true, reviewBeforePublish: config.reviewBeforePublish },
+    // Paid and waiting for "Publish now" (launchStage 'ready'), or set to go live as soon as the payment arrives.
+    publishWhenPaid: !!s.publishWhenPaid,
+    readyAt: s.readyAt || null,
+    closingPassed: closingPassed(s),
     bookingNotReady: false, // Stage 6: booking is built, so interviews and focus groups can launch
     usesBooking: BOOKING.includes(view.method),
   };
@@ -102,10 +142,10 @@ export async function launchView(userId: string, id: string) {
 type Receipt = { name: string; organization?: string; email: string; cc?: string; reference?: string; country: string };
 
 /** Starts paying for a study. Returns what the browser needs to finish a card payment, or the invoice. */
-export async function pay(userId: string, id: string, input: { method: 'card' | 'invoice'; useCredit?: boolean; receipt: Receipt; agree: boolean; paidBy?: string }) {
+export async function pay(userId: string, id: string, input: { method: 'card' | 'invoice'; useCredit?: boolean; receipt: Receipt; agree: boolean; paidBy?: string; publishWhenPaid?: boolean }) {
   const s = await owned(userId, id);
   if (s.status !== 'draft') throw new AppError('This study is already live.', 409, 'already_live');
-  if (!['none', 'changes-needed', 'awaiting-payment'].includes(s.launchStage || 'none')) throw new AppError('We’re already checking this study.', 409, 'in_review');
+  if (!['none', 'changes-needed', 'awaiting-payment', 'ready'].includes(s.launchStage || 'none')) throw new AppError('We’re already checking this study.', 409, 'in_review');
   const owner: any = await ResearcherModel.findById(userId).select('isCompleteProfile email');
   if (!owner?.isCompleteProfile) throw new AppError('Finish setting up your account before you launch a study.', 403, 'setup_incomplete');
   const view = await launchView(userId, id);
@@ -120,6 +160,8 @@ export async function pay(userId: string, id: string, input: { method: 'card' | 
     if (s.launchStage === 'changes-needed') return resubmit(userId, id);
     throw new AppError('This study is already paid for.', 409, 'already_paid');
   }
+  s.publishWhenPaid = !!input.publishWhenPaid;
+  await s.save();
   const creditUsed = input.useCredit ? Math.min(view.credit, due) : 0;
   const rest = round(due - creditUsed);
   const f: any = await FundingModel.create({
@@ -173,7 +215,7 @@ export async function pay(userId: string, id: string, input: { method: 'card' | 
       '',
       env.INVOICE_BANK_DETAILS ? `Pay to:\n${env.INVOICE_BANK_DETAILS.replace(/\\n/g, '\n')}` : 'We will send our bank details in a separate email.',
       '',
-      'We start checking your study as soon as the payment arrives.',
+      s.publishWhenPaid ? 'Your study goes live as soon as the payment arrives.' : 'When the payment arrives, your study is ready for you to publish.',
     ].join('\n'),
   });
   await sendMail({ to: reviewInbox(), subject: `Invoice ${f.number} sent (${f.currency} ${rest.toFixed(2)})`, text: `Study ${s._id}. Mark paid with: npm run review-study -- paid ${f.number}` });
@@ -220,11 +262,11 @@ export async function autoChecks(s: any) {
 }
 
 /**
- * After payment (or after a study is sent back with changes). With PUBLISH_ON_PAYMENT on (the default) the study
- * goes live straight away; with it off it waits for joinStudy's review (approve or ask for changes).
+ * After payment (or after a study is sent back with changes). With REVIEW_BEFORE_PUBLISH on, joinStudy checks it first;
+ * otherwise it's ready for the researcher to publish (or goes live at once if they ticked "Publish automatically").
  */
 async function startReview(s: any, why: string) {
-  if (config.publishOnPayment) return publishNow(s, why);
+  if (!config.reviewBeforePublish) return markReady(s, why);
   s.launchStage = 'checking';
   s.review = { checks: await autoChecks(s), note: '', requestedAt: new Date(), decidedAt: undefined };
   await s.save();
@@ -236,19 +278,130 @@ async function startReview(s: any, why: string) {
   });
 }
 
-/** Puts a paid study live at once: participants who fit can see and take it. joinStudy's inbox is told, for the record. */
-async function publishNow(s: any, why: string) {
+const titleOf = (s: any) => s.plan?.basics?.title || s.surveyName;
+async function researcherOf(s: any) {
+  const r: any = await ResearcherModel.findById(s.createdBy || s.userId).select('email firstName closedAt');
+  return r && !r.closedAt ? r : null;
+}
+/** A closing date that has already passed: the study can't go live until it's changed. */
+function closingPassed(s: any, now = new Date()) {
+  const p = s.plan?.pay;
+  return p?.closes === 'date' && !!p.closesAt && now.toISOString().slice(0, 10) > p.closesAt;
+}
+
+/** Paid (and approved, if joinStudy reviews): waits for "Publish now", unless they asked to publish automatically. */
+async function markReady(s: any, why: string) {
+  if (s.publishWhenPaid && !closingPassed(s)) return goLive(s, why);
+  const now = new Date();
+  s.launchStage = 'ready';
+  s.readyAt = now;
+  s.readyReminderAt = undefined;
+  if (!s.review?.requestedAt) s.review = { checks: [], note: '', requestedAt: now, decidedAt: now };
+  s.markModified('review');
+  await s.save();
+  const r = await researcherOf(s);
+  if (r) {
+    await sendMail({
+      to: r.email,
+      subject: 'Your study is ready to publish',
+      text: `Hi ${r.firstName || ''}, "${titleOf(s)}" is paid for and ready. Participants can't see it until you publish it.\n\nPublish it when you're ready: ${env.FRONTEND_URL}/dashboard/researcher/studies/${s._id}/launch/status`,
+    });
+  }
+  logger.info({ surveyId: String(s._id), why }, 'study ready to publish');
+}
+
+/** Puts a study live: participants who fit can see and take it. */
+export async function goLive(sOrId: any, why = 'Published.') {
+  const s: any = typeof sOrId === 'string' ? await SurveyModel.findById(sOrId) : sOrId;
+  if (!s) throw new AppError('Study not found.', 404);
   const now = new Date();
   s.status = 'published';
   s.publishedAt = now;
   s.launchStage = 'none';
-  s.review = { checks: [], note: '', requestedAt: now, decidedAt: now };
-  s.markModified('review');
+  s.readyReminderAt = undefined;
+  if (s.review) {
+    s.review.decidedAt = s.review.decidedAt || now;
+    s.markModified('review');
+  }
   await s.save();
-  const title = s.plan?.basics?.title || s.surveyName;
-  const r: any = await ResearcherModel.findById(s.createdBy || s.userId).select('email firstName closedAt');
-  if (r && !r.closedAt) await sendMail({ to: r.email, subject: 'Your study is live', text: `Hi ${r.firstName || ''}, "${title}" is live. Matching participants can see it now.` });
-  await sendMail({ to: reviewInbox(), subject: `Study published: ${title}`, text: `${why}\nStudy ${s._id} went live on payment (PUBLISH_ON_PAYMENT is on, so there was no review).` });
+  const r = await researcherOf(s);
+  if (r) await sendMail({ to: r.email, subject: 'Your study is live', text: `Hi ${r.firstName || ''}, "${titleOf(s)}" is live. Matching participants can see it now.` });
+  await sendMail({ to: reviewInbox(), subject: `Study published: ${titleOf(s)}`, text: `${why}\nStudy ${s._id} is live.` });
+  letWaitingIn();
+  return s;
+}
+
+/** "Publish now": the researcher puts a paid study live. Changes that raised the cost must be paid for first. */
+export async function publish(userId: string, id: string) {
+  const s = await owned(userId, id);
+  if (s.status !== 'draft') throw new AppError('This study is already live.', 409, 'already_live');
+  if (s.launchStage !== 'ready') throw new AppError(s.launchStage === 'checking' ? 'We’re still checking this study.' : 'Pay for this study first, then publish it.', 409, 'not_ready');
+  const view = await launchView(userId, id);
+  if (!view.ready) throw new AppError('Finish your plan first.', 400, 'plan_incomplete', { missing: view.missing });
+  if (view.due > 0) throw new AppError(`Your changes add ${view.figures.currency} ${view.due.toFixed(2)}. Pay the difference to publish.`, 402, 'top_up_needed', { due: view.due });
+  if (closingPassed(s)) throw new AppError('The closing date has passed. Choose a new date, then publish.', 409, 'closing_passed');
+  await goLive(s, 'Published by the researcher.');
+  return launchView(userId, id);
+}
+
+/**
+ * Paid but never published: cancel it and get everything back. Cards are refunded to the card; credit and bank
+ * transfers come back as credit (instant). The study stays as a draft, so it can be paid for again or deleted.
+ */
+export async function refundUnpublished(userId: string, id: string) {
+  const s = await owned(userId, id);
+  if (s.status !== 'draft' || s.launchStage !== 'ready') throw new AppError('Only a paid study that isn’t live yet can be cancelled.', 409, 'not_ready');
+  const fundings: any[] = await FundingModel.find({ surveyId: s._id, status: 'paid' });
+  for (const f of fundings) {
+    let toCredit = f.creditUsed || 0;
+    if (f.amount > 0 && (f.provider === 'stripe' || f.provider === 'test')) await refundCard(f.providerRef, f.amount);
+    else toCredit += f.amount || 0;
+    if (toCredit > 0) {
+      await TransactionModel.updateOne(
+        { ledgerKey: `${f._id}:credit-return` },
+        { $setOnInsert: { ownerId: f.researcherId, ownerType: 'researcher', kind: 'credit', status: 'available', amount: round(toCredit), currency: f.currency, surveyId: f.surveyId, description: `Returned: "${titleOf(s)}" wasn’t published` } },
+        { upsert: true }
+      );
+    }
+    f.status = 'refunded';
+    f.refunded = f.provider === 'stripe' || f.provider === 'test' ? f.amount : 0;
+    await f.save();
+    await TransactionModel.updateOne({ ledgerKey: `${f._id}:funding` }, { $set: { status: 'refunded' } });
+  }
+  s.launchStage = 'none';
+  s.readyAt = undefined;
+  s.readyReminderAt = undefined;
+  s.publishWhenPaid = false;
+  await s.save();
+  logger.info({ surveyId: String(s._id) }, 'unpublished study cancelled and refunded');
+  return launchView(userId, id);
+}
+
+/** Runs every few minutes: one reminder 2 days after a study became ready, if it still isn't live. */
+export async function remindUnpublished(now = new Date()) {
+  const due: any[] = await SurveyModel.find({ status: 'draft', launchStage: 'ready', readyAt: { $lte: new Date(now.getTime() - 2 * 864e5) }, readyReminderAt: null }).limit(200);
+  let sent = 0;
+  for (const s of due) {
+    const claimed = await SurveyModel.updateOne({ _id: s._id, readyReminderAt: null }, { $set: { readyReminderAt: now } });
+    if (!claimed.modifiedCount) continue;
+    const r = await researcherOf(s);
+    if (!r) continue;
+    await sendMail({
+      to: r.email,
+      subject: `"${titleOf(s)}" is paid for but not live yet`,
+      text: `Hi ${r.firstName || ''}, your study is ready, but participants can't see it until you publish it.\n\nPublish it: ${env.FRONTEND_URL}/dashboard/researcher/studies/${s._id}/launch/status\n\nChanged your mind? You can cancel it on the same page and get your money back.`,
+    });
+    sent += 1;
+  }
+  return { sent };
+}
+
+/** Refer a friend: a new live study makes room on the participant waitlist. Never holds up the payment. */
+function letWaitingIn() {
+  if (env.NODE_ENV === 'test') return; // tests call admitWaiting themselves
+  import('../referrals/waitlist.service')
+    .then(({ admitWaiting }) => admitWaiting())
+    .catch((error) => logger.error({ error }, 'Letting people in from the waitlist failed'));
 }
 
 /** Called by the webhook (Stripe), the test provider, the review script (invoices), or straight away for credit. Safe to call twice. */
@@ -270,11 +423,16 @@ export async function markPaid(fundingId: string, extra: { cardLast4?: string } 
   if (f.purpose === 'add-places') {
     const { applyExtraPlaces } = await import('../run/live.service');
     await applyExtraPlaces(f.surveyId, f.extraPlaces || 0, f.extraSession);
-  } else if (s && s.status === 'draft') await startReview(s, `Paid ${f.currency} ${(f.amount + f.creditUsed).toFixed(2)} (${f.method}).`);
+  } else if (s && s.status === 'draft') {
+    const why = `Paid ${f.currency} ${(f.amount + f.creditUsed).toFixed(2)} (${f.method}).`;
+    // A top-up after changes to a study that was already ready doesn't go through review again.
+    if (s.launchStage === 'ready') await markReady(s, why);
+    else await startReview(s, why);
+  }
   await sendMail({
     to: [f.receipt?.email, f.receipt?.cc].filter(Boolean).join(', '),
     subject: `Receipt ${f.number} from joinStudy`,
-    text: `Thanks. We received ${f.currency} ${(f.amount + f.creditUsed).toFixed(2)} for "${s?.plan?.basics?.title || s?.surveyName}". ${f.purpose === 'add-places' ? `The ${f.extraPlaces} extra places are open now.` : (config.publishOnPayment ? 'Your study is live now.' : 'We’re checking your study now and will email you when it’s live.')}`,
+    text: `Thanks. We received ${f.currency} ${(f.amount + f.creditUsed).toFixed(2)} for "${s?.plan?.basics?.title || s?.surveyName}". ${f.purpose === 'add-places' ? `The ${f.extraPlaces} extra places are open now.` : (s?.status === 'published' ? 'Your study is live now.' : s?.launchStage === 'checking' ? 'We’re checking your study now and will email you when it’s ready.' : 'Your study is ready: publish it whenever you like.')}`,
   });
   return f;
 }
@@ -287,7 +445,8 @@ export async function resubmit(userId: string, id: string) {
   if (!view.ready) throw new AppError('Finish your plan first.', 400, 'plan_incomplete', { missing: view.missing });
   if (view.due > 0) throw new AppError(`Your changes add ${view.figures.currency} ${view.due.toFixed(2)}. Pay the difference to send it back.`, 402, 'top_up_needed', { due: view.due });
   await startReview(s, 'Sent back after changes.');
-  return { fundingId: null, status: config.publishOnPayment ? ('live' as const) : ('checking' as const), method: null };
+  const after: any = await SurveyModel.findById(s._id).select('status launchStage');
+  return { fundingId: null, status: after?.status === 'published' ? ('live' as const) : after?.launchStage === 'ready' ? ('ready' as const) : ('checking' as const), method: null };
 }
 
 // ---------------------------------------------------------------- the team's side (review-study script)
@@ -303,13 +462,11 @@ async function forReview(surveyId: string) {
 export async function approve(surveyId: string) {
   const { s, r } = await forReview(surveyId);
   if (s.launchStage !== 'checking') throw new AppError(`This study is ${s.launchStage === 'none' ? s.status : s.launchStage}, not waiting for review.`, 409);
-  s.status = 'published';
-  s.publishedAt = new Date();
-  s.launchStage = 'none';
+  void r;
   s.review.decidedAt = new Date();
   s.markModified('review');
-  await s.save();
-  await sendMail({ to: r?.email, subject: 'Your study is live', text: `Hi ${r?.firstName || ''}, "${s.plan?.basics?.title || s.surveyName}" is live. Matching participants can see it now.` });
+  // Approved: it now waits for the researcher's "Publish now" (or goes live if they ticked "Publish automatically").
+  await markReady(s, 'Approved by joinStudy.');
   return s;
 }
 

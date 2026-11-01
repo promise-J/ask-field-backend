@@ -55,7 +55,7 @@ export async function planView(userId: string, id: string) {
   const missing = missingByStep(method, plan);
   const { places, minutes } = placesAndMinutes(method, plan);
   const perPerson = Number(plan.pay?.perPerson) || 0;
-  const feeRate = await feeRateFor(userId);
+  const feeRate = await feeRateFor(userId, s._id);
   const pay = round(perPerson * places);
   const fee = round(pay * feeRate);
   const me: any = await ResearcherModel.findById(userId).select('organizationName institutionVerification');

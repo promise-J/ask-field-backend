@@ -11,6 +11,10 @@ export const VERIFY_FIRST: Record<string, string> = {
 
 /** The study gate: called before anyone is let into a study (survey.service checkEligibility). */
 export function assertCanTakeStudies(participant: any) {
+  // Refer a friend: people on the waitlist can't start studies until there's room in their country.
+  if (participant?.access?.status === 'waiting') {
+    throw new AppError("You're on the waitlist. We'll email you as soon as there's room for you.", 403, 'on_waitlist');
+  }
   if (!env.REQUIRE_PARTICIPANT_VERIFICATION) return;
   const status = participant?.verification?.status || 'none';
   if (status === 'verified') return;

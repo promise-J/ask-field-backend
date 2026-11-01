@@ -9,7 +9,7 @@ import { verifyAccessToken, UserType } from '../utils/jwt';
 /** Things anyone can do for themselves, whatever their role in the workspace they're looking at. */
 const PERSONAL = /^\/api\/(researchers\/me\/(account|email|password|email-prefs|close|workspaces)|team\/(invite\/[^/]+\/accept|leave))/;
 /** Paying and managing the team: owners and admins only. */
-const MONEY_OR_TEAM = /\/(launch\/pay|launch\/cancel-invoice|live\/add-places|finish\/return-to)$|^\/api\/(billing\/test-confirm|researchers\/me\/(team|billing|profile|verification)|team\/(invite|members))/;
+const MONEY_OR_TEAM = /\/(launch\/pay|launch\/cancel-invoice|launch\/refund|live\/add-places|finish\/return-to)$|^\/api\/(billing\/test-confirm|researchers\/me\/(team|billing|profile|verification)|team\/(invite|members))/;
 
 const forbid = (res: Response, error: string) => res.status(403).json({ success: false, error, message: error, code: 'role_forbidden' });
 

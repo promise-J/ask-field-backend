@@ -31,6 +31,8 @@ export const launchPaySchema = z.object({
   method: z.enum(['card', 'invoice']),
   useCredit: z.boolean().default(false),
   agree: z.boolean().default(false),
+  // "Publish automatically when the payment arrives" (off by default: the researcher clicks "Publish now").
+  publishWhenPaid: z.boolean().default(false),
   receipt: z.object({
     name: z.string().trim().min(1, 'Add the name for the receipt.').max(160),
     organization: z.string().trim().max(200).default(''),

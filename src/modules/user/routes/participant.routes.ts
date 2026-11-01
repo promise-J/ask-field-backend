@@ -3,19 +3,9 @@ import { validate } from '../../../middlewares/validate';
 import { authMiddleware, requireRole } from '../../../middlewares/auth.middleware';
 import { authLimiter } from '../../../middlewares/rateLimiter.middleware';
 import { participantController as c, completeProfile, participantAuth as participantAuthService } from '../controllers/participant.controller';
-import {
-  resendVerificationSchema,
-  completeProfileSchema,
-  loginSchema,
-  registerParticipantSchema,
-  resetPasswordSchema,
-  sendOtpSchema,
-  verifyOtpSchema,
-} from '../user.validation';
 import walletRoutes from '../../wallet/wallet.participant.routes';
 import verificationRoutes from '../../verification/verification.routes';
 import { participantSignupGuards } from '../../../utils/signupGuards';
-import { changeUnconfirmedEmailSchema, participantWaitlistSchema, unifiedGoogleSchema } from '../user.validation';
 import * as account from '../services/account.service';
 import { asyncHandler } from '../../../utils/asyncHandler';
 import { apiSuccessResponse } from '../../../utils/apiResponse';
@@ -26,6 +16,7 @@ import { z } from 'zod';
 import studiesRoutes from '../../studies/studies.routes';
 import { stopAlertsByLink } from '../../studies/studies.service';
 import accountRoutes, { publicAccountRoutes } from '../../account/account.routes';
+import { changeUnconfirmedEmailSchema, completeProfileSchema, loginSchema, participantWaitlistSchema, registerParticipantSchema, resendVerificationSchema, resetPasswordSchema, sendOtpSchema, unifiedGoogleSchema, verifyOtpSchema } from '../user.validation';
 
 const router = Router();
 const participantOnly = [authMiddleware, requireRole('participant')];
@@ -50,7 +41,7 @@ router.get('/auth/verify-email', c.verifyEmail);
 router.post('/auth/resend-verification', authLimiter, validate(resendVerificationSchema), c.resendVerification);
 // Older clients call this path; a NEW participant account still needs the country and agreement (canvas 1.2).
 router.post('/auth/google-auth', authLimiter, validate(unifiedGoogleSchema), asyncHandler(async (req: Request, res: Response) => {
-  const data = await account.google(req.body.token, { accountType: 'participant', intent: 'participant', country: req.body.country, agree: req.body.agree });
+  const data = await account.google(req.body.token, { accountType: 'participant', intent: 'participant', country: req.body.country, agree: req.body.agree, ref: req.body.ref });
   apiSuccessResponse(res, 'Signed in with Google.', data);
 }));
 // Works for researchers too: the frontend uses this one path for every account type.

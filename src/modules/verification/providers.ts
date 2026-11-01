@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import AppError from '../../error-helpers/appError';
 import logger from '../../config/logger';
-import { env } from '../../config/env';
+import { env } from '../../config';
 import { matchesHash, randomOtp, sha256 } from '../../utils/hash';
 
 /**

@@ -24,6 +24,8 @@ const researcherSchema = new Schema(
       status: { type: String, enum: ['none', 'applied', 'dismissed'], default: 'none' },
       at: { type: Date },
     },
+    // Refer a friend: the dashboard card was hidden with "Not now".
+    referralCardHiddenAt: Date,
     // Stage 2.2: proof the researcher works where they say. Gives the badge and the academic fee.
     institutionVerification: {
       status: { type: String, enum: ['none', 'pending', 'verified', 'rejected'], default: 'none' },

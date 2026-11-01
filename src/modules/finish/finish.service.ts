@@ -85,7 +85,7 @@ export async function finishView(userId: string, id: string, now = new Date()) {
   const count = (st: string) => actions.filter((a: any) => a.status === st).length;
   const perPerson = Number(s.plan?.pay?.perPerson) || s.surveyAmount || 0;
   const { places, minutes } = placesAndMinutes(methodOf(s), s.plan || {});
-  const waitingIfApproved = round(b.toReview * perPerson * (1 + (await feeRateFor(userId))));
+  const waitingIfApproved = round(b.toReview * perPerson * (1 + (await feeRateFor(userId, s._id))));
   const times = actions.filter((a: any) => a.timeSpent && ['approved', 'submitted'].includes(a.status)).map((a: any) => a.timeSpent).sort((x: number, y: number) => x - y);
   return {
     surveyId: String(s._id),
