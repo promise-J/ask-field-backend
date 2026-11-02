@@ -21,7 +21,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().optional(),
 
   // Where the React app lives. Used to build links in emails.
-  FRONTEND_URL: z.string().default('http://localhost:5173'),
+  FRONTEND_URL: z.string(),
   // Comma-separated list of allowed browser origins. Empty = allow all (development only).
   CORS_ORIGINS: z.string().optional(),
 
