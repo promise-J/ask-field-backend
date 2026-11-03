@@ -9,6 +9,7 @@ import { requestLogger } from './middlewares/requestLogger.middleware';
 import errorController from './error-helpers/error.controller';
 import AppError from './error-helpers/appError';
 import { stripeWebhook } from './modules/billing/billing.routes';
+import { smileIdWebhook } from './modules/verification/verification.routes';
 import { env, config } from './config/env';
 
 const app = express();
@@ -32,6 +33,8 @@ if (env.NODE_ENV !== 'test') {
 }
 // Stripe signs the raw body, so its webhook must skip the JSON parser.
 app.post('/api/billing/webhook', express.raw({ type: 'application/json', limit: '1mb' }), stripeWebhook);
+// Participant verification: Smile ID sends selfie results here (signed; no sign-in). Its payload can be larger.
+app.post('/api/verification/smileid/webhook', express.json({ limit: '2mb' }), smileIdWebhook);
 app.use(express.json({ limit: '200kb' }));
 app.use(rateLimiter);
 

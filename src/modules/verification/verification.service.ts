@@ -4,7 +4,8 @@ import AppError from '../../error-helpers/appError';
 import { config, env } from '../../config/env';
 import { ParticipantModel } from '../user/models/participant.model';
 import { sendMail } from '../../utils/mailer';
-import { Channel, phoneProvider, selfieProvider, SelfieOutcome } from './providers';
+import { Channel, phoneProvider, selfieProvider, SelfieOutcome, smileOutcome, smileSignatureOk } from './providers';
+import logger from '../../config/logger';
 import { VERIFY_FIRST } from './gate';
 import { closedRecently } from '../account/settings.service';
 export { assertCanTakeStudies } from './gate';
@@ -121,12 +122,16 @@ export async function sendCode(participantId: string, raw: string, channel: Chan
   }
   if (recent.length >= MAX_SENDS_PER_HOUR) throw new AppError('Too many codes in the last hour. Try again later.', 429, 'too_many_codes');
 
-  const { ref } = await phoneProvider().send(e164, channel);
-  v.pending = { ref, phoneHash: hash, phoneLast2: e164.slice(-2), channel, sentAt: new Date(), attempts: 0 };
+  // Termii without WhatsApp switched on sends WhatsApp requests by SMS: `used` is what actually went out.
+  console.log(`Sending ${channel} code to ${e164} (hash ${hash}) for participant ${p._id}`);
+  const sent = await phoneProvider().send(e164, channel);
+  const ref = sent.ref;
+  const used: Channel = sent.channel || channel;
+  v.pending = { ref, phoneHash: hash, phoneLast2: e164.slice(-2), channel: used, sentAt: new Date(), attempts: 0 };
   v.sends = [...recent, new Date()];
   p.markModified('verification');
   await p.save();
-  return { sentTo: `+${PHONE_RULES[country].code} ••• ••• ••${e164.slice(-2)}`, channel, retryAfter: SEND_GAP_MS / 1000 };
+  return { sentTo: `+${PHONE_RULES[country].code} ••• ••• ••${e164.slice(-2)}`, channel: used, retryAfter: SEND_GAP_MS / 1000 };
 }
 
 export async function checkCode(participantId: string, code: string) {
@@ -182,7 +187,7 @@ export async function startSelfie(participantId: string) {
   v.selfieProvider = selfieProvider().name;
   p.markModified('verification');
   await p.save();
-  return { session: s.session, mode: s.mode, clientToken: s.clientToken };
+  return { session: s.session, mode: s.mode, clientToken: s.clientToken, sdk: s.sdk };
 }
 
 async function toReview(p: any, note: string) {
@@ -209,6 +214,7 @@ export async function applySelfieOutcome(p: any, outcome: SelfieOutcome, ref?: s
     await toReview(p, 'The automatic check wasn’t sure.');
     return;
   } else {
+    if (v.status === 'checking') v.status = 'phone'; // back to "take a selfie"
     v.selfieAttempts = (v.selfieAttempts || 0) + 1;
     if (v.selfieAttempts >= MAX_SELFIE_TRIES) {
       p.markModified('verification');
@@ -225,8 +231,37 @@ export async function completeSelfie(participantId: string, session: string, tes
   const v = p.verification;
   if (!v.selfieSession || v.selfieSession !== session) throw new AppError('This selfie session has ended. Start again.', 409, 'session_ended');
   const r = await selfieProvider().result(session, { testOutcome });
+  if (r.outcome === 'pending') {
+    // Smile ID: the selfie was taken; the result comes by webhook, usually within a minute. The session stays open for it.
+    if (v.status !== 'verified') v.status = 'checking';
+    p.markModified('verification');
+    await p.save();
+    return status(participantId);
+  }
   await applySelfieOutcome(p, r.outcome, r.ref);
   return status(participantId);
+}
+
+/**
+ * Smile ID's webhook (POST /api/verification/smileid/webhook). Checks the signature, finds the participant by the
+ * job id we gave the session, and applies the result. Safe to receive twice: a finished session is ignored.
+ */
+export async function smileWebhook(headers: Record<string, unknown>, body: any) {
+  const h = (k: string) => String(headers[k.toLowerCase()] ?? body?.[k === 'Response-Timestamp' ? 'timestamp' : 'signature'] ?? '');
+  if (!smileSignatureOk(h('Response-Timestamp'), h('Response-Signature'))) {
+    throw new AppError('Bad signature.', 401, 'bad_signature');
+  }
+  const r = smileOutcome(body);
+  if (!r.jobId) return { applied: false };
+  const p: any = await ParticipantModel.findOne({ 'verification.selfieSession': r.jobId }).select('+verification.selfieSession');
+  if (!p) {
+    logger.info({ jobId: r.jobId }, 'Smile ID webhook for a session that has already ended');
+    return { applied: false };
+  }
+  await applySelfieOutcome(p, r.outcome, r.ref);
+  // The browser shows "checking" until now; tell the person by email too, in case they closed the page.
+  if (r.outcome === 'verified') await sendMail({ to: p.email, subject: 'You’re verified on joinStudy', text: 'Your selfie check passed. Sign in to see the studies you qualify for.' });
+  return { applied: true, outcome: r.outcome };
 }
 
 /** Our team's decision on a selfie a person had to look at (npm run review-participant). */

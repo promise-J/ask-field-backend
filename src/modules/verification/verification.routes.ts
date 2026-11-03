@@ -48,4 +48,10 @@ router.post('/selfie/complete', validate(selfieSchema), asyncHandler(async (req:
   apiSuccessResponse(res, s.status === 'verified' ? 'You’re verified.' : 'Selfie checked.', s);
 }));
 
+/** Smile ID's results (mounted in app.ts at /api/verification/smileid/webhook, before the sign-in check). */
+export const smileIdWebhook = asyncHandler(async (req: Request, res: Response) => {
+  const r = await verify.smileWebhook(req.headers as Record<string, unknown>, req.body || {});
+  res.json({ success: true, ...r });
+});
+
 export default router;

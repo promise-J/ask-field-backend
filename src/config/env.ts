@@ -21,7 +21,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().optional(),
 
   // Where the React app lives. Used to build links in emails.
-  FRONTEND_URL: z.string(),
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
   // Comma-separated list of allowed browser origins. Empty = allow all (development only).
   CORS_ORIGINS: z.string().optional(),
 
@@ -34,8 +34,6 @@ const envSchema = z.object({
   REQUIRE_EMAIL_VERIFICATION: bool(true),
   // Where founding-lab, request-a-country and AI-pilot form submissions are emailed.
   LEADS_INBOX: z.string().default('hello@joinstudy.io'),
-  BREVO_API_KEY: z.string().optional(),
-  APP_NAME: z.string().default('JoinStudy'),
 
   // Firebase Admin, used to verify "Continue with Google" sign-ins from the frontend.
   FIREBASE_PROJECT_ID: z.string().optional(),
@@ -79,11 +77,31 @@ const envSchema = z.object({
   // One-time verification before a participant's first study: a WhatsApp/SMS code, then a selfie.
   // Set to false to let unverified participants take studies (e.g. while providers are being chosen).
   REQUIRE_PARTICIPANT_VERIFICATION: bool(true),
-  // Who sends the WhatsApp/SMS code. "test" writes codes to the log (outside production only).
-  // Real providers (Termii, Africa's Talking) plug in at src/modules/verification/providers.ts once chosen.
-  PHONE_PROVIDER: z.enum(['test']).default('test'),
-  // Who checks the selfie (liveness + one face per account). "test" lets you choose the result (outside production only).
-  SELFIE_PROVIDER: z.enum(['test']).default('test'),
+  // Who sends the WhatsApp/SMS code. "test" writes codes to the log (outside production only); "termii" sends them.
+  PHONE_PROVIDER: z.enum(['test', 'termii']).default('termii'),
+  // Termii (dashboard → API & Webhooks): the API key, the base URL shown on that page, and an approved Sender ID.
+  TERMII_API_KEY: z.string().optional(),
+  TERMII_BASE_URL: z.string().default('https://api.ng.termii.com'),
+  TERMII_SENDER_ID: z.string().optional(),
+  // "dnd" (the transactional route: reaches numbers on Do-Not-Disturb, recommended for codes in Nigeria) or "generic".
+  TERMII_CHANNEL: z.enum(['dnd', 'generic']).default('generic'),
+  // Termii WhatsApp OTP (switched on by Termii support): the WhatsApp device/sender name. Unset = WhatsApp codes go by SMS.
+  TERMII_WHATSAPP_FROM: z.string().optional(),
+  // Who checks the selfie (liveness + one face per account). "test" lets you choose the result (outside production only);
+  // "smileid" uses Smile ID SmartSelfie registration, with Smile Secure for faces already on another account.
+  SELFIE_PROVIDER: z.enum(['test', 'smileid']).default('smileid'),
+  // Smile ID (portal → Developers): partner ID and API key for the environment below. sandbox = test keys, no real checks.
+  SMILEID_PARTNER_ID: z.string().optional(),
+  SMILEID_API_KEY: z.string().optional(),
+  SMILEID_ENV: z.enum(['sandbox', 'production']).default('sandbox'),
+  // Optional: a different Smile ID API address (otherwise testapi.smileidentity.com or api.smileidentity.com).
+  SMILEID_BASE_URL: z.string().optional(),
+  // Where Smile ID sends results: <your API address>/api/verification/smileid/webhook (must be public https).
+  SMILEID_CALLBACK_URL: z.string().optional(),
+  // Shown in Smile ID's camera screens.
+  SMILEID_COMPANY_NAME: z.string().default('joinStudy'),
+  SMILEID_LOGO_URL: z.string().default('https://www.joinstudy.io/joinstudy-logo-icon.png'),
+  SMILEID_POLICY_URL: z.string().default('https://www.joinstudy.io/privacy'),
   // Secret mixed into phone-number hashes so a leaked database can't be reversed. Defaults to one derived from JWT_SECRET.
   PHONE_HASH_SECRET: z.string().optional(),
   // Participant Stage 2: "Connect LinkedIn" (optional). A LinkedIn app with "Sign In with LinkedIn using OpenID Connect".
@@ -111,6 +129,9 @@ const envSchema = z.object({
   // Cash for a participant whose invited friend gets PARTICIPANT_REFERRAL_STUDIES studies approved. 0 = no cash.
   PARTICIPANT_REFERRAL_REWARD: z.string().default('0'),
   PARTICIPANT_REFERRAL_STUDIES: z.string().default('3'),
+
+  BREVO_API_KEY: z.string(),
+  APP_NAME: z.string().default('JoinStudy'),
 });
 
 export const env = envSchema.parse(process.env);
